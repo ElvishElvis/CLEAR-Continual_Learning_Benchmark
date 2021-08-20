@@ -9,7 +9,7 @@ from PIL import Image
 import torch
 class CLEARDataset(Dataset):
     def __init__(self, data_txt_path,stage,n_classes=11,n_experiences=10):
-        assert stage in ['train','test']
+        assert stage in ['train','test','all']
         print('Preparing {}'.format(stage))
         self.n_classes=n_classes
         self.n_experiences=n_experiences
@@ -102,7 +102,7 @@ def get_transforms():
         normalize,
     ])
     return train_transform, test_transform
-def get_data_set():
+def get_data_set_offline():
     train_Dataset=CLEARDataset(data_txt_path='/data/jiashi/data_train_path.txt',stage='train')
     print("Number of train data is {}".format(len(train_Dataset)))
     test_Dataset=CLEARDataset(data_txt_path='/data/jiashi/data_test_path.txt',stage='test')
@@ -140,8 +140,41 @@ def get_data_set():
         eval_transform=test_transform,
         seed=1234)
 
+
+def get_data_set_online():
+    all_Dataset=CLEARDataset(data_txt_path='/data/jiashi/data_all_path.txt',stage='all')
+    print("Number of all data is {}".format(len(all_Dataset)))
+    n_experiences=10
+    all_timestamp_index=all_Dataset.get_timestamp_index()
+    train_transform,test_transform=get_transforms()
+
+    list_all_dataset = []
+
+
+    # for every incremental experience
+    split_num_all=len(all_Dataset)//n_experiences
+    for i in range(n_experiences):
+        # choose a random permutation of the pixels in the image
+        all_sub = CLEARSubset(all_Dataset,all_timestamp_index[i],all_Dataset.targets[i*split_num_all:(i+1)*split_num_all])
+        list_all_dataset.append(all_sub)
+    return nc_benchmark(
+        list_all_dataset,
+        list_all_dataset,
+        n_experiences=len(list_all_dataset),
+        task_labels=True,
+        shuffle=True,
+        class_ids_from_zero_in_each_exp=True,
+        one_dataset_per_exp=True,
+        train_transform=train_transform,
+        eval_transform=test_transform,
+        seed=1234)
+
+
+
+
+
 if __name__ == '__main__':
-    dataset=get_data_set()
+    dataset=get_data_set_online()
     import pdb;pdb.set_trace()
     print('finsih')
 # # from torchvision.datasets import MNIST
@@ -186,4 +219,4 @@ if __name__ == '__main__':
 #     print('Task {} batch {} -> train'.format(t, exp_id))
 #     print('This batch contains', len(training_dataset), 'patterns')
 #     print("Current Classes: ", experience.classes_in_this_experience)
-# [len(dataset.train_stream[ii].dataset) for ii in range(10)]
+# [len(dataset.test_stream[ii].dataset) for ii in range(10)]

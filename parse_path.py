@@ -22,7 +22,7 @@ data_dir ='/scratch/zhiqiu/yfcc_dynamic_10/dynamic_300/images'
 #     return _files
 
 def list_all_files(rootdir):
-    train_list,test_list = [],[]
+    train_list,test_list,all_list = [],[],[]
     bucket_list = os.listdir(rootdir)
     classes_list=  os.listdir(osp.join(rootdir,bucket_list[0]))
     for bucket in bucket_list:
@@ -32,15 +32,19 @@ def list_all_files(rootdir):
             train_subset,test_subset=train_test_split(image_list,test_size=0.3, random_state=42)
             train_list.extend(train_subset)
             test_list.extend(test_subset)
-    return train_list,test_list
+            all_list.extend(image_list)
+    return train_list,test_list,all_list
 
-train_list, test_list= list_all_files(data_dir)
+train_list, test_list,all_list= list_all_files(data_dir)
 
-for stage in ['train','test']:
+for stage in ['train','test','all']:
     if(stage=='train'):
         image_list=train_list
-    else:
+    elif(stage=='test'):
         image_list=test_list
+    else:
+        image_list=all_list
+
     with open('/data/jiashi/data_{}_path.txt'.format(stage) , 'w') as file:
         file.write("file class_index timestamp")
         for item in image_list:
