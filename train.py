@@ -9,10 +9,13 @@ from avalanche.evaluation.metrics import forgetting_metrics, accuracy_metrics, \
     loss_metrics, timing_metrics, cpu_usage_metrics, confusion_matrix_metrics, disk_usage_metrics
 from avalanche.logging import InteractiveLogger, TextLogger, TensorboardLogger
 from avalanche.training.plugins import EvaluationPlugin
-from avalanche.training.strategies import Naive, CWRStar, Replay, GDumb, Cumulative, LwF, GEM, AGEM, EWC,JointTraining
+from avalanche.training.strategies import Naive, CWRStar, Replay, GDumb, Cumulative, LwF, GEM, AGEM, EWC,JointTraining,SynapticIntelligence,CoPE
+from avalanche.training.strategies.icarl import ICaRL
 from load_dataset import *
-
-
+import argparse
+argparser = argparse.ArgumentParser()
+argparser.add_argument("--method",default='Naive GDumb')
+                       
 
 
 def build_logger(name):
@@ -51,14 +54,18 @@ weight_decay=1e-5
 momentum=0.9
 os.makedirs("./log/",exist_ok=True)
 os.makedirs("./model/",exist_ok=True)
+args = argparser.parse_args()
+method_query=args.method.split()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # torch.cuda.get_device_name(0)
 # torch.cuda.device_count() 
 
+
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
-for strate in ['GDumb','Naive','JointTraining','Cumulative']:
-    for current_mode in ['online','offline']:
+# ['GDumb','Naive','JointTraining','Cumulative']
+for strate in method_query:
+    for current_mode in ['offline','online']:
         if(current_mode=='offline'):
             scenario = get_data_set_offline()
         else:
@@ -76,7 +83,6 @@ for strate in ['GDumb','Naive','JointTraining','Cumulative']:
             print("only use one GPU")
         optimizer=SGD(model.parameters(), lr=start_lr, weight_decay=weight_decay,momentum=momentum)
         scheduler= make_scheduler(optimizer,30,0.1)
-
         if strate=='CWRStar':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = CWRStar(
@@ -119,19 +125,19 @@ for strate in ['GDumb','Naive','JointTraining','Cumulative']:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GEM(
                 model, optimizer,
-                CrossEntropyLoss(), 256,0.5, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), patterns_per_exp=256,memory_strength=0.5, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='AGEM':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = AGEM(
                 model, optimizer,
-                CrossEntropyLoss(),256,256, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(),patterns_per_exp=256,sample_size=256, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='EWC':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = EWC(
                 model, optimizer,
-                CrossEntropyLoss(), 0.4, 'online',decay_factor=0.1,
+                CrossEntropyLoss(), ewc_lambda=0.4, ewc_mode='separate',decay_factor=0.1,
                 train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='Naive':
@@ -140,6 +146,25 @@ for strate in ['GDumb','Naive','JointTraining','Cumulative']:
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+        elif strate=='ICaRL':
+            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+            cl_strategy = ICaRL(
+                model, optimizer,
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+        elif strate=='SynapticIntelligence':
+            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+            cl_strategy = SynapticIntelligence(
+                model, optimizer,
+                CrossEntropyLoss(), si_lambda=0.0001,train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+        elif strate=='CoPE':
+            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+            cl_strategy = SynapticIntelligence(
+                model, optimizer,
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+                
         # except:
         #     print('###########################################')
         #     print('###########################################')

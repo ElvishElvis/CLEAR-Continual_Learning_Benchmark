@@ -16,7 +16,7 @@ class CLEARDataset(Dataset):
         self.stage=stage
         if(os.path.isfile(data_txt_path)==False):
             print('loading data_list from folder')
-            os.system('python3 /data/jiashi/avalanche/parse_path.py')
+            os.system('python3 /data/jiashi/avalanche/parse_data_path.py')
         self.prepare_data(data_txt_path)
         self.targets=torch.from_numpy(np.array(self.targets))
         # self.train_transform,self.test_transform=self.get_transforms()
