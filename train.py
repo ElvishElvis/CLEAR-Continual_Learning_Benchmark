@@ -9,8 +9,11 @@ from avalanche.evaluation.metrics import forgetting_metrics, accuracy_metrics, \
     loss_metrics, timing_metrics, cpu_usage_metrics, confusion_matrix_metrics, disk_usage_metrics
 from avalanche.logging import InteractiveLogger, TextLogger, TensorboardLogger
 from avalanche.training.plugins import EvaluationPlugin
+from avalanche.training.plugins.gdumb import GDumbPlugin
 from avalanche.training.strategies import Naive, CWRStar, Replay, GDumb, Cumulative, LwF, GEM, AGEM, EWC,JointTraining,SynapticIntelligence,CoPE
 from avalanche.training.strategies.icarl import ICaRL
+from avalanche.training.strategies.ar1 import AR1
+from avalanche.training.strategies.deep_slda import StreamingLDA
 from load_dataset import *
 import argparse
 argparser = argparse.ArgumentParser()
@@ -52,14 +55,16 @@ batch_size=64
 start_lr=0.01
 weight_decay=1e-5
 momentum=0.9
+timestamp=10
+num_classes=11
 os.makedirs("./log/",exist_ok=True)
 os.makedirs("./model/",exist_ok=True)
 args = argparser.parse_args()
 method_query=args.method.split()
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# torch.cuda.get_device_name(0)
-# torch.cuda.device_count() 
+zbb = torch.zbb("cuda:0" if torch.cuda.is_available() else "cpu")
+# torch.cuda.get_zbb_name(0)
+# torch.cuda.zbb_count() 
 
 
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
@@ -76,7 +81,7 @@ for strate in method_query:
         print('========================================================')
         print('========================================================')
         model=resnet18(pretrained=False)
-        if torch.cuda.device_count() > 1:
+        if torch.cuda.zbb_count() > 1:
             print("Let's use all GPUs!")
             model = nn.DataParallel(model)
         else:
@@ -93,20 +98,21 @@ for strate in method_query:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Replay(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=np.sum(data_count),
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
-        elif strate=='JointTraining':
+        elif (strate=='JointTraining' and current_mode=='offline'):
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = JointTraining(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch*timestamp, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='GDumb':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+            data_count=[scenario.train_stream[ii].dataset for ii in range(timestamp)]
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
-                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=3300)
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=np.sum(data_count))
         elif strate=='Cumulative':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Cumulative(
@@ -118,7 +124,7 @@ for strate in method_query:
             cl_strategy = LwF(
                 model, optimizer,
                 CrossEntropyLoss(),
-                alpha=[0, 0.5, 1.333, 2.25, 3.2],temperature=1,
+                alpha= np.linespace(0,2,num=timestamp).tolist(),temperature=1,
                 train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='GEM':
@@ -137,7 +143,7 @@ for strate in method_query:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = EWC(
                 model, optimizer,
-                CrossEntropyLoss(), ewc_lambda=0.4, ewc_mode='separate',decay_factor=0.1,
+                CrossEntropyLoss(), ewc_lambda=0.4, mode='separate',decay_factor=0.1,
                 train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='Naive':
@@ -146,12 +152,12 @@ for strate in method_query:
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
-        elif strate=='ICaRL':
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
-            cl_strategy = ICaRL(
-                model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
-                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+        # elif strate=='ICaRL':
+        #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+        #     cl_strategy = ICaRL(
+        #         model, optimizer,
+        #         CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+        #         evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='SynapticIntelligence':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = SynapticIntelligence(
@@ -160,17 +166,32 @@ for strate in method_query:
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='CoPE':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
-            cl_strategy = SynapticIntelligence(
+            cl_strategy = CoPE(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=np.sum(data_count),
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
-                
+        # elif strate=='AR1':
+        #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+        #     cl_strategy = AR1(
+        #         model, optimizer,
+        #         CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+        #         evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+        # elif strate=='StreamingLDA':
+        #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+        #     cl_strategy = StreamingLDA(
+        #         slda_model=model, 
+        #         criterion=CrossEntropyLoss(), input_size= 224,num_classes=num_classes,train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+        #         evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+        
+        else:
+            continue
         # except:
         #     print('###########################################')
         #     print('###########################################')
         #     print('skipping {}'.format(strate))
         #     continue
         # TRAINING LOOP
+        
         print('Starting experiment...')
         results = []
         for experience in scenario.train_stream:

@@ -97,7 +97,7 @@ def get_transforms():
 
     test_transform = transforms.Compose([
         transforms.Resize(224),
-        transforms.RandomCrop(224),
+        transforms.CenterCrop(224),
         transforms.ToTensor(),
         normalize,
     ])

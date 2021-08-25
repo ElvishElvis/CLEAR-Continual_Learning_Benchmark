@@ -1,19 +1,75 @@
 import os
 import numpy as np
+def get_offline_protocol_index(class_=10):
+    eval_list={'offline':[],'online':[],'backward':[],'forward':[],'accuracy':[]}
+    count=0
+    for i in range(class_):
+        for k in range(class_):
+            if(i==k):
+                eval_list['offline'].append(count)
+                eval_list['accuracy'].append(count)
+            if(i+1==k):
+                eval_list['online'].append(count)
+            if(i>k):
+                eval_list['backward'].append(count)
+                eval_list['accuracy'].append(count)
+            if(i<k):
+                eval_list['forward'].append(count)
+                
+            count=count+1
+    assert len(eval_list['offline'])==class_
+    assert len(eval_list['online'])==class_-1
+    assert len(eval_list['backward'])==int(class_*(class_-1)/2)
+    assert len(eval_list['forward'])==int(class_*(class_-1)/2)
+    assert len(eval_list['accuracy'])==int(class_*(class_+1)/2)
+    return eval_list
+
+def get_online_protocol_index(class_=10):
+    eval_list={'online':[],'forward':[]}
+    # to match our script, since 0-10 is 0
+    count=class_
+    for i in range(class_):
+        for k in range(class_):
+            if(i+1==k):
+                eval_list['online'].append(count)
+            if(i<k):
+                eval_list['forward'].append(count)
+                
+            count=count+1
+    assert len(eval_list['online'])==class_-1
+    assert len(eval_list['forward'])==int(class_*(class_-1)/2)
+    return eval_list
+
+
 logpath='./log/'
-log_list=os.listdir(logpath)
-result_list=[]
+log_list=sorted(os.listdir(logpath))
+
 for name in log_list:
-    with open(os.path.join(logpath,name), 'r') as file:
-        while True:
-            try:
-                line=file.readline()
-                if('Top1_Acc_Stream/eval_phase/test_stream/Task00' in line):
-                    result_list.append(float(line.split()[-1]))
-            except:
-                break
-            
-    print("{} have count {}, with mean of {}".format(name,len(result_list),np.mean(result_list))
+    result_list=[]
+    file=open(os.path.join(logpath,name), 'r')
+    while(True):
+        line=file.readline()
+        if('Top1_Acc_Stream/eval_phase/test_stream/Task00' in line):
+            result_list.append(float(line.split()[-1]))
+        if not line:
+            break
+    file.close()
+    if(len(result_list)!=100):
+        if('online' in name):
+            assert np.sum(result_list[:10])==0
+            result_list=result_list[10:]
+        print("{} count of {}, with mean of {}".format(name,len(result_list), np.mean(result_list)))
+    else:
+        result_list=np.array(result_list)
+        if('online' in name):
+            assert np.sum(result_list[:10])==0
+            index_list=get_online_protocol_index (class_=10)
+        else:
+            index_list=get_offline_protocol_index(class_=10)
+        result_list=[str(np.mean(result_list[np.array(item[1])])) for item in index_list.items()]
+        key_list=[item[0] for item in index_list.items()]
+        print("{} with {} of {}".format(name,", ".join(key_list),", ".join(result_list)))
+        
 
 
 
