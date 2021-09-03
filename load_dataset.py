@@ -7,6 +7,7 @@ from avalanche.benchmarks.utils import AvalancheDataset,AvalancheSubset
 from avalanche.benchmarks import NCScenario, nc_benchmark,dataset_benchmark,ni_benchmark
 from PIL import Image
 import torch
+from avalanche.benchmarks  import benchmark_with_validation_stream
 class CLEARDataset(Dataset):
     def __init__(self, data_txt_path,stage,n_classes=11,n_experiences=10):
         assert stage in ['train','test','all']
@@ -55,6 +56,17 @@ class CLEARDataset(Dataset):
         return len(self.samples)
     
     def __getitem__(self,index):
+        import os
+        os.makedirs('./buffered_data/train',exist_ok=True)
+        os.makedirs('./buffered_data/test',exist_ok=True)
+        os.makedirs('./buffered_data/all',exist_ok=True)
+        file_path='./buffered_data/{}/{}.npy'.format(self.stage,str(index))
+        # if(os.path.isfile(file_path)):
+        #     print('loaded data')
+        #     image_array,label= np.load(file_path,allow_pickle=True)
+        #     sample=Image.fromarray(image_array)
+        #     return sample,label
+        # else:
         sample, label = Image.open(self.samples[index][0]),self.samples[index][1]
         array=np.array(sample)
         # some image may have 4 channel (alpha)
@@ -65,10 +77,8 @@ class CLEARDataset(Dataset):
         elif(len(array.shape)==2):
             array=np.stack([array,array,array],axis=-1)
         sample=Image.fromarray(array)
-        # if(self.stage=='train'):
-        #     sample=self.train_transform(sample)
-        # else:
-        #     sample=self.test_transform(sample)
+        # result= array,label
+        # np.save('./buffered_data/{}/{}'.format(self.stage,str(index)),result)
         return sample,label
 class CLEARSubset(Dataset):
     def __init__(self, dataset, indices, labels):
@@ -138,7 +148,10 @@ def get_data_set_offline():
         one_dataset_per_exp=True,
         train_transform=train_transform,
         eval_transform=test_transform,
-        seed=1234)
+        seed=1235)
+    # valid_benchmark = benchmark_with_validation_stream(
+    #         initial_benchmark_instance, 20, shuffle=False)
+    # return valid_benchmark
 
 
 def get_data_set_online():
@@ -167,7 +180,7 @@ def get_data_set_online():
         one_dataset_per_exp=True,
         train_transform=train_transform,
         eval_transform=test_transform,
-        seed=1234)
+        seed=1235)
 
 
 

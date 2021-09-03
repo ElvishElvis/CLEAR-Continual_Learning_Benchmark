@@ -14,6 +14,7 @@ from avalanche.training.strategies import Naive, CWRStar, Replay, GDumb, Cumulat
 from avalanche.training.strategies.icarl import ICaRL
 from avalanche.training.strategies.ar1 import AR1
 from avalanche.training.strategies.deep_slda import StreamingLDA
+from avalanche.training.plugins.early_stopping import EarlyStoppingPlugin
 from load_dataset import *
 import argparse
 argparser = argparse.ArgumentParser()
@@ -49,7 +50,7 @@ def make_scheduler(optimizer, step_size=30, gamma=0.1):
     )
     return scheduler
 
-nepoch=100
+nepoch=70
 step=30
 batch_size=64
 start_lr=0.01
@@ -62,9 +63,9 @@ os.makedirs("./model/",exist_ok=True)
 args = argparser.parse_args()
 method_query=args.method.split()
 
-zbb = torch.zbb("cuda:0" if torch.cuda.is_available() else "cpu")
-# torch.cuda.get_zbb_name(0)
-# torch.cuda.zbb_count() 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# torch.cuda.get_device_name(0)
+# torch.cuda.device_count() 
 
 
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
@@ -81,11 +82,14 @@ for strate in method_query:
         print('========================================================')
         print('========================================================')
         model=resnet18(pretrained=False)
-        if torch.cuda.zbb_count() > 1:
+        data_count=3300 if current_mode=='online' else 2310
+        if torch.cuda.device_count() > 1:
             print("Let's use all GPUs!")
             model = nn.DataParallel(model)
         else:
-            print("only use one GPU")
+            print("nly use one GPU")
+        if(torch.cuda.is_available()):
+            model=model.cuda()
         optimizer=SGD(model.parameters(), lr=start_lr, weight_decay=weight_decay,momentum=momentum)
         scheduler= make_scheduler(optimizer,30,0.1)
         if strate=='CWRStar':
@@ -98,21 +102,20 @@ for strate in method_query:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Replay(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=np.sum(data_count),
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=data_count,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif (strate=='JointTraining' and current_mode=='offline'):
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = JointTraining(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch*timestamp, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='GDumb':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
-            data_count=[scenario.train_stream[ii].dataset for ii in range(timestamp)]
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
-                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=np.sum(data_count))
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=data_count)
         elif strate=='Cumulative':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Cumulative(
@@ -124,7 +127,7 @@ for strate in method_query:
             cl_strategy = LwF(
                 model, optimizer,
                 CrossEntropyLoss(),
-                alpha= np.linespace(0,2,num=timestamp).tolist(),temperature=1,
+                alpha= np.linspace(0,2,num=timestamp).tolist(),temperature=1,
                 train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='GEM':
@@ -168,7 +171,7 @@ for strate in method_query:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = CoPE(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=np.sum(data_count),
+                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=data_count,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         # elif strate=='AR1':
         #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
@@ -194,25 +197,30 @@ for strate in method_query:
         
         print('Starting experiment...')
         results = []
-        for experience in scenario.train_stream:
-            print("Start of experience: ", experience.current_experience)
-            print("Current Classes: ", experience.classes_in_this_experience)
-            # offline
-            if(current_mode=='offline'):
-                # train returns a dictionary which contains all the metric values
-                res = cl_strategy.train(experience)
-                print('Training completed')
-                print('Computing accuracy on the whole test set')
-                # test also returns a dictionary which contains all the metric values
-                results.append(cl_strategy.eval(scenario.test_stream))
-            # online
-            else:
-                print('Computing accuracy on the future timestamp')
-                results.append(cl_strategy.eval(scenario.test_stream))
-                # train returns a dictionary which contains all the metric values
-                res = cl_strategy.train(experience)
-                print('Training completed')
-        torch.save(model.state_dict(), './model/model_{}__{}.pth'.format(strate,current_mode))
+        if(strate=='JointTraining' and current_mode=='offline'):
+            cl_strategy.train(scenario.train_stream)
+            results.append(cl_strategy.eval(scenario.test_stream))
+            torch.save(model.state_dict(), './model/model_{}__{}.pth'.format(strate,current_mode))
+        else:
+            for experience in scenario.train_stream:
+                print("Start of experience: ", experience.current_experience)
+                print("Current Classes: ", experience.classes_in_this_experience)
+                # offline
+                if(current_mode=='offline'):
+                    # train returns a dictionary which contains all the metric values
+                    res = cl_strategy.train(experience)
+                    print('Training completed')
+                    print('Computing accuracy on the whole test set')
+                    # test also returns a dictionary which contains all the metric values
+                    results.append(cl_strategy.eval(scenario.test_stream))
+                # online
+                else:
+                    print('Computing accuracy on the future timestamp')
+                    results.append(cl_strategy.eval(scenario.test_stream))
+                    # train returns a dictionary which contains all the metric values
+                    res = cl_strategy.train(experience)
+                    print('Training completed')
+                torch.save(model.state_dict(), './model/model_{}__{}.pth'.format(strate,current_mode))
                 
             
             

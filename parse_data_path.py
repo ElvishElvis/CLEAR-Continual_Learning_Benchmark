@@ -5,8 +5,8 @@ from sklearn.model_selection import train_test_split
 class_list=['NEGATIVE','baseball','bus','camera','cosplay','dress','hockey','laptop','racing','soccer','sweater']
 
 
-# data_dir = '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images'      
-data_dir ='/scratch/zhiqiu/yfcc_dynamic_10/dynamic_300/images'
+data_dir = '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images'      
+# data_dir ='/scratch/zhiqiu/yfcc_dynamic_10/dynamic_300/images'
 
 
 # def list_all_files(rootdir):
@@ -29,7 +29,7 @@ def list_all_files(rootdir):
         for classes in classes_list:
             image_list=os.listdir(osp.join(rootdir,bucket,classes))
             image_list=list(map(lambda a: osp.join(osp.join(rootdir,bucket,classes,a)), image_list))
-            train_subset,test_subset=train_test_split(image_list,test_size=0.3, random_state=42)
+            train_subset,test_subset=train_test_split(image_list,test_size=0.3, random_state=43)
             train_list.extend(train_subset)
             test_list.extend(test_subset)
             all_list.extend(image_list)

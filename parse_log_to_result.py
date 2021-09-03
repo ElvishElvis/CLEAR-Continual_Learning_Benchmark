@@ -48,7 +48,10 @@ for name in log_list:
     result_list=[]
     file=open(os.path.join(logpath,name), 'r')
     while(True):
-        line=file.readline()
+        try:
+            line=file.readline()
+        except:
+            break
         if('Top1_Acc_Stream/eval_phase/test_stream/Task00' in line):
             result_list.append(float(line.split()[-1]))
         if not line:
@@ -66,6 +69,8 @@ for name in log_list:
             index_list=get_online_protocol_index (class_=10)
         else:
             index_list=get_offline_protocol_index(class_=10)
+        # print(result_list)
+        print(result_list)
         result_list=[str(np.mean(result_list[np.array(item[1])])) for item in index_list.items()]
         key_list=[item[0] for item in index_list.items()]
         print("{} with {} of {}".format(name,", ".join(key_list),", ".join(result_list)))
@@ -80,7 +85,7 @@ for name in log_list:
 #         matrix = matrix / matrix.mean(axis=0).reshape(1,-1)
 #         cbar_str = "Test Accuracy"
 #         format_score = lambda s : f"{s:.2f}"
-#     elif normalize_by_column:
+#    elif normalize_by_column:
 #         matrix = matrix / matrix.mean(axis=0).reshape(1,-1)
 #         cbar_str = "Test Accuracy / Average Test accuracy per column"
 #         format_score = lambda s : f"{s:.2f}"
