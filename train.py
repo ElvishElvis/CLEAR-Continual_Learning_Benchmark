@@ -17,11 +17,7 @@ from avalanche.training.strategies.deep_slda import StreamingLDA
 from avalanche.training.plugins.early_stopping import EarlyStoppingPlugin
 from load_dataset import *
 import argparse
-argparser = argparse.ArgumentParser()
-argparser.add_argument("--method",default='Naive GDumb')
                        
-
-
 def build_logger(name):
     # log to text file
     text_logger = TextLogger(open('./log/log_{}.txt'.format(name), 'w'))
@@ -49,6 +45,10 @@ def make_scheduler(optimizer, step_size=30, gamma=0.1):
         gamma=gamma
     )
     return scheduler
+
+
+argparser = argparse.ArgumentParser()
+argparser.add_argument("--method",default='Naive GDumb')
 
 nepoch=70
 step=30
@@ -134,13 +134,13 @@ for strate in method_query:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GEM(
                 model, optimizer,
-                CrossEntropyLoss(), patterns_per_exp=256,memory_strength=0.5, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), patterns_per_exp=data_count,memory_strength=0.5, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='AGEM':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = AGEM(
                 model, optimizer,
-                CrossEntropyLoss(),patterns_per_exp=256,sample_size=256, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(),patterns_per_exp=data_count,sample_size=data_count, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='EWC':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
@@ -200,26 +200,32 @@ for strate in method_query:
         if(strate=='JointTraining' and current_mode=='offline'):
             cl_strategy.train(scenario.train_stream)
             results.append(cl_strategy.eval(scenario.test_stream))
+            print('current strate is {} {}'.format(strate,current_mode))
             torch.save(model.state_dict(), './model/model_{}__{}.pth'.format(strate,current_mode))
         else:
             for experience in scenario.train_stream:
                 print("Start of experience: ", experience.current_experience)
                 print("Current Classes: ", experience.classes_in_this_experience)
+                print('current strate is {} {}'.format(strate,current_mode))
                 # offline
                 if(current_mode=='offline'):
                     # train returns a dictionary which contains all the metric values
                     res = cl_strategy.train(experience)
+                    print('current strate is {} {}'.format(strate,current_mode))
                     print('Training completed')
                     print('Computing accuracy on the whole test set')
                     # test also returns a dictionary which contains all the metric values
                     results.append(cl_strategy.eval(scenario.test_stream))
+                    print('current strate is {} {}'.format(strate,current_mode))
                 # online
                 else:
+                    print('current strate is {} {}'.format(strate,current_mode))
                     print('Computing accuracy on the future timestamp')
                     results.append(cl_strategy.eval(scenario.test_stream))
                     # train returns a dictionary which contains all the metric values
                     res = cl_strategy.train(experience)
                     print('Training completed')
+                    print('current strate is {} {}'.format(strate,current_mode))
                 torch.save(model.state_dict(), './model/model_{}__{}.pth'.format(strate,current_mode))
                 
             
