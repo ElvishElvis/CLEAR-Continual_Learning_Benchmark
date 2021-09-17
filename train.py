@@ -16,11 +16,12 @@ from avalanche.training.strategies.ar1 import AR1
 from avalanche.training.strategies.deep_slda import StreamingLDA
 from avalanche.training.plugins.early_stopping import EarlyStoppingPlugin
 from load_dataset import *
+from parse_data_path import *
 import argparse
                        
 def build_logger(name):
     # log to text file
-    text_logger = TextLogger(open('./log/log_{}.txt'.format(name), 'w'))
+    text_logger = TextLogger(open('../{}/log/log_{}.txt'.format(args.split,name), 'w'))
 
     # print to stdout
     interactive_logger = InteractiveLogger()
@@ -38,7 +39,7 @@ def build_logger(name):
     )
     return text_logger ,interactive_logger,eval_plugin
 
-def make_scheduler(optimizer, step_size=30, gamma=0.1):
+def make_scheduler(optimizer, step_size, gamma):
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer,
         step_size=step_size,
@@ -46,22 +47,42 @@ def make_scheduler(optimizer, step_size=30, gamma=0.1):
     )
     return scheduler
 
-
 argparser = argparse.ArgumentParser()
-argparser.add_argument("--method",default='Naive GDumb')
+argparser.add_argument("--data_folder_path")
+argparser.add_argument("--class_list")
+argparser.add_argument("--method")
+argparser.add_argument("--split",default='clear10')
+argparser.add_argument("--restart",default='0')
+argparser.add_argument("--nepoch",type=int,default=70)
+argparser.add_argument("--step_schedular_decay",type=int,default=30)
+argparser.add_argument("--schedular_step",type=float,default=0.1)
+argparser.add_argument("--batch_size",type=int,default=64)
+argparser.add_argument("--start_lr",type=float,default=0.01)
+argparser.add_argument("--weight_decay",type=float,default=1e-5)
+argparser.add_argument("--momentum",type=float,default=0.9)
+argparser.add_argument("--timestamp",type=int,default=10)
+argparser.add_argument("--num_classes",type=int,default=11)
+argparser.add_argument("--num_instance_each_class",type=int,default=300)
+argparser.add_argument("--random_seed",type=int,default=1111)
+argparser.add_argument("--test_split",type=float,default=0.3)
 
-nepoch=70
-step=30
-batch_size=64
-start_lr=0.01
-weight_decay=1e-5
-momentum=0.9
-timestamp=10
-num_classes=11
-os.makedirs("./log/",exist_ok=True)
-os.makedirs("./model/",exist_ok=True)
+
+global args
 args = argparser.parse_args()
+try:
+    restart=int(args.restart)
+except:
+    print('restart flag must be 0/1')
+    assert False
+if(restart==1):
+    os.system('rm -rf ../{}'.format(args.split))
+    print('remove old split folder')
+os.makedirs("../{}".format(args.split),exist_ok=True)
+os.makedirs("../{}/log/".format(args.split),exist_ok=True)
+os.makedirs("../{}/model/".format(args.split),exist_ok=True)
 method_query=args.method.split()
+
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # torch.cuda.get_device_name(0)
@@ -73,117 +94,118 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 for strate in method_query:
     for current_mode in ['offline','online']:
         if(current_mode=='offline'):
-            scenario = get_data_set_offline()
+            scenario = get_data_set_offline(args)
         else:
-            scenario = get_data_set_online()
+            scenario = get_data_set_online(args)
         print('========================================================')
         print('========================================================')
         print('current strate is {} {}'.format(strate,current_mode))
         print('========================================================')
         print('========================================================')
         model=resnet18(pretrained=False)
-        data_count=3300 if current_mode=='online' else 2310
+        data_count=int(args.num_classes*args.num_instance_each_class) if current_mode=='online' else int(args.num_classes*args.num_instance_each_class*(1-args.test_split))
+        print('data_count is {}'.format(data_count))
         if torch.cuda.device_count() > 1:
             print("Let's use all GPUs!")
             model = nn.DataParallel(model)
         else:
-            print("nly use one GPU")
+            print("only use one GPU")
         if(torch.cuda.is_available()):
             model=model.cuda()
-        optimizer=SGD(model.parameters(), lr=start_lr, weight_decay=weight_decay,momentum=momentum)
-        scheduler= make_scheduler(optimizer,30,0.1)
+        optimizer=SGD(model.parameters(), lr=args.start_lr, weight_decay=args.weight_decay,momentum=args.momentum)
+        scheduler= make_scheduler(optimizer,args.step_schedular_decay,args.schedular_step)
         if strate=='CWRStar':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = CWRStar(
                 model, optimizer,
-                CrossEntropyLoss(),cwr_layer_name=None, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(),cwr_layer_name=None, train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
-        elif strate=='Replay':
+        elif strate=='Replay': 
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Replay(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=data_count,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,mem_size=data_count,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif (strate=='JointTraining' and current_mode=='offline'):
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = JointTraining(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='GDumb':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GDumb(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=data_count)
         elif strate=='Cumulative':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Cumulative(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='LwF':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = LwF(
                 model, optimizer,
                 CrossEntropyLoss(),
-                alpha= np.linspace(0,2,num=timestamp).tolist(),temperature=1,
-                train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                alpha= np.linspace(0,2,num=args.timestamp).tolist(),temperature=1,
+                train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='GEM':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GEM(
                 model, optimizer,
-                CrossEntropyLoss(), patterns_per_exp=data_count,memory_strength=0.5, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), patterns_per_exp=data_count,memory_strength=0.5, train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='AGEM':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = AGEM(
                 model, optimizer,
-                CrossEntropyLoss(),patterns_per_exp=data_count,sample_size=data_count, train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(),patterns_per_exp=data_count,sample_size=data_count, train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='EWC':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = EWC(
                 model, optimizer,
                 CrossEntropyLoss(), ewc_lambda=0.4, mode='separate',decay_factor=0.1,
-                train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='Naive':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Naive(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         # elif strate=='ICaRL':
         #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         #     cl_strategy = ICaRL(
         #         model, optimizer,
-        #         CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+        #         CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
         #         evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='SynapticIntelligence':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = SynapticIntelligence(
                 model, optimizer,
-                CrossEntropyLoss(), si_lambda=0.0001,train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+                CrossEntropyLoss(), si_lambda=0.0001,train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='CoPE':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = CoPE(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,mem_size=data_count,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,mem_size=data_count,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         # elif strate=='AR1':
         #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         #     cl_strategy = AR1(
         #         model, optimizer,
-        #         CrossEntropyLoss(), train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+        #         CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
         #         evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         # elif strate=='StreamingLDA':
         #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         #     cl_strategy = StreamingLDA(
         #         slda_model=model, 
-        #         criterion=CrossEntropyLoss(), input_size= 224,num_classes=num_classes,train_mb_size=batch_size, train_epochs=nepoch, eval_mb_size=batch_size,
+        #         criterion=CrossEntropyLoss(), input_size= 224,num_classes=args.num_classes,train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
         #         evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         
         else:
@@ -201,7 +223,7 @@ for strate in method_query:
             cl_strategy.train(scenario.train_stream)
             results.append(cl_strategy.eval(scenario.test_stream))
             print('current strate is {} {}'.format(strate,current_mode))
-            torch.save(model.state_dict(), './model/model_{}__{}.pth'.format(strate,current_mode))
+            torch.save(model.state_dict(), '../model/model_{}__{}.pth'.format(strate,current_mode))
         else:
             for experience in scenario.train_stream:
                 print("Start of experience: ", experience.current_experience)
@@ -226,7 +248,7 @@ for strate in method_query:
                     res = cl_strategy.train(experience)
                     print('Training completed')
                     print('current strate is {} {}'.format(strate,current_mode))
-                torch.save(model.state_dict(), './model/model_{}__{}.pth'.format(strate,current_mode))
+                torch.save(model.state_dict(), '../model/model_{}__{}.pth'.format(strate,current_mode))
                 
             
             

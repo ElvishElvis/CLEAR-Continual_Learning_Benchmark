@@ -1,0 +1,19 @@
+CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
+--split clear10 \
+--data_folder_path '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images' \
+--class_list 'NEGATIVE baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
+--method 'Naive GDumb CWRStar Cumulative JointTraining LwF AGEM EWC SynapticIntelligence Replay CoPE' \
+--split  'clear10' \
+--restart '1' \
+--nepoch 70 \
+--step_schedular_decay 30 \
+--schedular_step 0.1 \
+--batch_size 64 \
+--start_lr 0.01 \
+--weight_decay 1e-5 \
+--momentum  0.9 \
+--timestamp  10 \
+--num_classes   11 \
+--num_instance_each_class 300 \
+--random_seed 1111 \
+--test_split 0.3

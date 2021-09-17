@@ -8,23 +8,26 @@ from avalanche.benchmarks import NCScenario, nc_benchmark,dataset_benchmark,ni_b
 from PIL import Image
 import torch
 from avalanche.benchmarks  import benchmark_with_validation_stream
+from parse_data_path import *
 class CLEARDataset(Dataset):
-    def __init__(self, data_txt_path,stage,n_classes=11,n_experiences=10):
+    def __init__(self, args,data_txt_path,stage):
         assert stage in ['train','test','all']
         print('Preparing {}'.format(stage))
-        self.n_classes=n_classes
-        self.n_experiences=n_experiences
+        self.args=args
+        self.n_classes=args.num_classes
+        self.n_experiences=args.timestamp
         self.stage=stage
         if(os.path.isfile(data_txt_path)==False):
             print('loading data_list from folder')
-            os.system('python3 /data/jiashi/avalanche/parse_data_path.py')
+            parse_data_path(args)
         self.prepare_data(data_txt_path)
         self.targets=torch.from_numpy(np.array(self.targets))
+        print('Using split {}'.format(self.args.split))
         # self.train_transform,self.test_transform=self.get_transforms()
     def get_timestamp_index(self):
         return self.timestamp_index
     def prepare_data(self,data_txt_path):
-        save_path='/data/jiashi/{}_save'.format(self.stage)
+        save_path='../{}/data_cache/{}_save'.format(self.args.split,self.stage)
         if(os.path.isfile(save_path+'.npy')):
             self.targets,self.samples,self.timestamp_index=np.load(save_path+'.npy',allow_pickle=True)
         else:
@@ -57,10 +60,10 @@ class CLEARDataset(Dataset):
     
     def __getitem__(self,index):
         import os
-        os.makedirs('./buffered_data/train',exist_ok=True)
-        os.makedirs('./buffered_data/test',exist_ok=True)
-        os.makedirs('./buffered_data/all',exist_ok=True)
-        file_path='./buffered_data/{}/{}.npy'.format(self.stage,str(index))
+        os.makedirs('../{}/buffered_data/train'.format(self.args.split),exist_ok=True)
+        os.makedirs('../{}/buffered_data/test'.format(self.args.split),exist_ok=True)
+        os.makedirs('../{}/buffered_data/all'.format(self.args.split),exist_ok=True)
+        file_path='../{}/buffered_data/{}/{}.npy'.format(self.args.split,self.stage,str(index))
         # if(os.path.isfile(file_path)):
         #     print('loaded data')
         #     image_array,label= np.load(file_path,allow_pickle=True)
@@ -112,13 +115,13 @@ def get_transforms():
         normalize,
     ])
     return train_transform, test_transform
-def get_data_set_offline():
-    train_Dataset=CLEARDataset(data_txt_path='/data/jiashi/data_train_path.txt',stage='train')
+def get_data_set_offline(args):
+    train_Dataset=CLEARDataset(args,data_txt_path='../{}/data_cache/data_train_path.txt'.format(args.split),stage='train')
     print("Number of train data is {}".format(len(train_Dataset)))
-    test_Dataset=CLEARDataset(data_txt_path='/data/jiashi/data_test_path.txt',stage='test')
+    test_Dataset=CLEARDataset(args,data_txt_path='../{}/data_cache/data_test_path.txt'.format(args.split),stage='test')
     print("Number of test data is {}".format(len(test_Dataset)))
     # import pdb;pdb.set_trace()
-    n_experiences=10
+    n_experiences=args.timestamp
     train_timestamp_index,test_timestamp_index=train_Dataset.get_timestamp_index(),test_Dataset.get_timestamp_index()
     train_transform,test_transform=get_transforms()
     # print(train_timestamp_index)
@@ -148,16 +151,16 @@ def get_data_set_offline():
         one_dataset_per_exp=True,
         train_transform=train_transform,
         eval_transform=test_transform,
-        seed=1235)
+        seed=args.random_seed)
     # valid_benchmark = benchmark_with_validation_stream(
     #         initial_benchmark_instance, 20, shuffle=False)
     # return valid_benchmark
 
 
-def get_data_set_online():
-    all_Dataset=CLEARDataset(data_txt_path='/data/jiashi/data_all_path.txt',stage='all')
+def get_data_set_online(args):
+    all_Dataset=CLEARDataset(data_txt_path='../{}/data_cache/data_all_path.txt'.format(args.split),stage='all')
     print("Number of all data is {}".format(len(all_Dataset)))
-    n_experiences=10
+    n_experiences=args.timestamp
     all_timestamp_index=all_Dataset.get_timestamp_index()
     train_transform,test_transform=get_transforms()
 
@@ -180,7 +183,7 @@ def get_data_set_online():
         one_dataset_per_exp=True,
         train_transform=train_transform,
         eval_transform=test_transform,
-        seed=1235)
+        seed=args.random_seed)
 
 
 

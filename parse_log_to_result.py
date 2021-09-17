@@ -41,7 +41,7 @@ def get_online_protocol_index(class_=10):
     return eval_list
 
 
-logpath='./log/'
+logpath='../log/'
 log_list=sorted(os.listdir(logpath))
 
 for name in log_list:
