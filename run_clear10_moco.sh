@@ -1,8 +1,8 @@
 CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
---data_folder_path '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images' \
+--data_folder_path '/data/jiashi/moco_feature' \
 --class_list 'NEGATIVE baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
 --method 'Naive GDumb CWRStar Cumulative JointTraining LwF AGEM EWC SynapticIntelligence Replay CoPE' \
---split  'clear10' \
+--split  'clear10_moco' \
 --restart '1' \
 --nepoch 70 \
 --step_schedular_decay 30 \
@@ -17,4 +17,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --random_seed 1111 \
 --test_split 0.3 \
 --feature_path '/data/jiashi/' \
---pretrain_feature 'None'
+--pretrain_feature 'moco_feature'

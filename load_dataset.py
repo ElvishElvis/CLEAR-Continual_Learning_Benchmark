@@ -9,6 +9,18 @@ from PIL import Image
 import torch
 from avalanche.benchmarks  import benchmark_with_validation_stream
 from parse_data_path import *
+'''
+timestamp_index stand for, for each timestamp, the index of instance in the big data folder, since each subset represent
+one timestamp data, thus we need to have the index of data of each timestamp
+'''
+
+
+def get_feature_extract_loader(args):
+    dataset=CLEARDataset(args,data_txt_path='../{}/data_cache/data_all_path.txt'.format(args.split),stage='all')
+    all_timestamp_index=dataset.get_timestamp_index()
+    return dataset,all_timestamp_index
+
+
 class CLEARDataset(Dataset):
     def __init__(self, args,data_txt_path,stage):
         assert stage in ['train','test','all']
@@ -46,7 +58,7 @@ class CLEARDataset(Dataset):
                         samples.append(line_list)
                         index=index+1
                         if(index%10000==0):
-                            print('finished {}'.format(index))
+                            print('finished processing data {}'.format(index))
                     except:
                         break
             self.targets=targets
@@ -70,16 +82,19 @@ class CLEARDataset(Dataset):
         #     sample=Image.fromarray(image_array)
         #     return sample,label
         # else:
-        sample, label = Image.open(self.samples[index][0]),self.samples[index][1]
-        array=np.array(sample)
-        # some image may have 4 channel (alpha)
-        if(array.shape[-1]==4):
-            array=array[:,:,:3]
-        elif(array.shape[-1]==1):
-            array=np.concatenate((array, array, array), axis=-1)
-        elif(len(array.shape)==2):
-            array=np.stack([array,array,array],axis=-1)
-        sample=Image.fromarray(array)
+        if(self.args.pretrain_feature!='None'):
+            sample, label = torch.load(self.samples[index][0])[0],self.samples[index][1]
+        else:
+            sample, label = Image.open(self.samples[index][0]),self.samples[index][1]
+            array=np.array(sample)
+            # some image may have 4 channel (alpha)
+            if(array.shape[-1]==4):
+                array=array[:,:,:3]
+            elif(array.shape[-1]==1):
+                array=np.concatenate((array, array, array), axis=-1)
+            elif(len(array.shape)==2):
+                array=np.stack([array,array,array],axis=-1)
+            sample=Image.fromarray(array)
         # result= array,label
         # np.save('./buffered_data/{}/{}'.format(self.stage,str(index)),result)
         return sample,label
@@ -94,7 +109,7 @@ class CLEARSubset(Dataset):
 
     def __len__(self):
         return len(self.targets)
-def get_transforms():
+def get_transforms(args):
     # Note that this is not exactly imagenet transform/moco transform for val set
     # Because we resize to 224 instead of 256
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -114,6 +129,8 @@ def get_transforms():
         transforms.ToTensor(),
         normalize,
     ])
+    if(args.pretrain_feature!='None'):
+        train_transform,test_transform=None,None
     return train_transform, test_transform
 def get_data_set_offline(args):
     train_Dataset=CLEARDataset(args,data_txt_path='../{}/data_cache/data_train_path.txt'.format(args.split),stage='train')
@@ -123,7 +140,7 @@ def get_data_set_offline(args):
     # import pdb;pdb.set_trace()
     n_experiences=args.timestamp
     train_timestamp_index,test_timestamp_index=train_Dataset.get_timestamp_index(),test_Dataset.get_timestamp_index()
-    train_transform,test_transform=get_transforms()
+    train_transform,test_transform=get_transforms(args)
     # print(train_timestamp_index)
 
     list_train_dataset = []
@@ -158,7 +175,7 @@ def get_data_set_offline(args):
 
 
 def get_data_set_online(args):
-    all_Dataset=CLEARDataset(data_txt_path='../{}/data_cache/data_all_path.txt'.format(args.split),stage='all')
+    all_Dataset=CLEARDataset(args,data_txt_path='../{}/data_cache/data_all_path.txt'.format(args.split),stage='all')
     print("Number of all data is {}".format(len(all_Dataset)))
     n_experiences=args.timestamp
     all_timestamp_index=all_Dataset.get_timestamp_index()

@@ -55,6 +55,8 @@ def parse_data_path(args):
                 if classes not in class_list:
                     continue
                 class_index=class_list.index(classes)
-                timestamp=name_list[-3].split('_')[-1]
+                timestamp=name_list[-3].split('_')[-1] # since name is bucket_3
+                if(int(timestamp)==0): # skip bucket 0, since it's for moco feature
+                    continue
                 file.write(item+ " "+str(class_index)+" "+str(timestamp))
         print('{} parse path finish!'.format(stage))
