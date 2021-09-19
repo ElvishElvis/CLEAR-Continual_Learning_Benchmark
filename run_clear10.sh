@@ -3,7 +3,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --class_list 'NEGATIVE baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
 --method 'Naive GDumb CWRStar Cumulative JointTraining LwF AGEM EWC SynapticIntelligence Replay CoPE' \
 --split  'clear10' \
---restart '1' \
+--restart '0' \
 --nepoch 70 \
 --step_schedular_decay 30 \
 --schedular_step 0.1 \

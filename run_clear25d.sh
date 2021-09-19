@@ -3,7 +3,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --class_list 'ad_board athletic_shoe bag boats car coat graffiti lamp microphone nyc ring subway top airplane board_game bus church dress highway lego mobile_phone piano skyscraper sunglasses train' \
 --method 'Naive GDumb CWRStar Cumulative JointTraining LwF AGEM EWC SynapticIntelligence Replay CoPE' \
 --split  'clear25d' \
---restart '1' \
+--restart '0' \
 --nepoch 70 \
 --step_schedular_decay 30 \
 --schedular_step 0.1 \

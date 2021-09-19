@@ -62,8 +62,12 @@ except:
     print('restart flag must be 0/1')
     assert False
 if(restart==1):
-    os.system('rm -rf ../{}'.format(args.split))
-    print('remove old split folder')
+    print('???!!!!!!!!!!!!!!!!!!!!!!!!!You sure to remove the old checkpoint ???!!!!!!!!!!!!!!!!!!!!!!!!!')
+    print('enter Y/y to continue')
+    value=input()
+    if(value=="y" or value=='Y'):
+        os.system('rm -rf ../{}'.format(args.split))
+        print('remove old split folder')
 os.makedirs("../{}".format(args.split),exist_ok=True)
 os.makedirs("../{}/log/".format(args.split),exist_ok=True)
 os.makedirs("../{}/model/".format(args.split),exist_ok=True)
@@ -87,13 +91,13 @@ if(args.pretrain_feature!='None'):
 '''
 Move data from /data to /scratch (for trinity server)
 '''
-# target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
-# print('Moving data to local server')
-# if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
-#     os.system('rm -rf {}'.format(target_path))
-#     os.makedirs(target_path,exist_ok=True)
-#     os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
-# args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
+target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
+print('Moving data to local server')
+if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
+    os.system('rm -rf {}'.format(target_path))
+    os.makedirs(target_path,exist_ok=True)
+    os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
+args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
 
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
 # ['GDumb','Naive','JointTraining','Cumulative']
@@ -225,14 +229,18 @@ for strate in method_query:
         #     print('skipping {}'.format(strate))
         #     continue
         # TRAINING LOOP
-        
+        model_save_path='../{}/model/model_{}__{}.pth'.format(args.split,strate,current_mode)
+        if(os.path.isfile(model_save_path)):
+            print('Skip model {}'.format(model_save_path))
+            continue
         print('Starting experiment...')
         results = []
         if(strate=='JointTraining' and current_mode=='offline'):
             cl_strategy.train(scenario.train_stream)
             results.append(cl_strategy.eval(scenario.test_stream))
             print('current strate is {} {}'.format(strate,current_mode))
-            torch.save(model.state_dict(), '../{}/model/model_{}__{}.pth'.format(args.split,strate,current_mode))
+            torch.save(model.state_dict(), model_save_path)
+            
         else:
             for experience in scenario.train_stream:
                 print("Start of experience: ", experience.current_experience)
@@ -257,7 +265,7 @@ for strate in method_query:
                     res = cl_strategy.train(experience)
                     print('Training completed')
                     print('current strate is {} {}'.format(strate,current_mode))
-                torch.save(model.state_dict(), '../{}/model/model_{}__{}.pth'.format(args.split,strate,current_mode))
+                torch.save(model.state_dict(), model_save_path)
                 
             
             
