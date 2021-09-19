@@ -24,6 +24,8 @@ def list_all_files(args,rootdir):
     if('bucket_0' in bucket_list):
         bucket_list.remove('bucket_0') # skip bucket 0, since it's for pretrain feature
     classes_list=  os.listdir(osp.join(rootdir,bucket_list[0]))
+    if(args.split=='clear25d' and 'BACKGROUND' in classes_list):
+        classes_list.remove('BACKGROUND') # skip bucket 0, since it's for pretrain feature
     for bucket in bucket_list:
         for classes in classes_list:
             image_list=os.listdir(osp.join(rootdir,bucket,classes))

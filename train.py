@@ -87,13 +87,13 @@ if(args.pretrain_feature!='None'):
 '''
 Move data from /data to /scratch (for trinity server)
 '''
-target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
-print('Moving data to local server')
-if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
-    os.system('rm -rf {}'.format(target_path))
-    os.makedirs(target_path,exist_ok=True)
-    os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
-args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
+# target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
+# print('Moving data to local server')
+# if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
+#     os.system('rm -rf {}'.format(target_path))
+#     os.makedirs(target_path,exist_ok=True)
+#     os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
+# args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
 
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
 # ['GDumb','Naive','JointTraining','Cumulative']
