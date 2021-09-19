@@ -82,7 +82,12 @@ class CLEARDataset(Dataset):
         #     sample=Image.fromarray(image_array)
         #     return sample,label
         # else:
-        if(self.args.pretrain_feature!='None'):
+        '''
+        when using pre-train feature and data_folder_path had already be updated
+        When generating pretrain feature, the data_folder_path is original image path
+        When finish generating pretrain feature, the data_folder_path is feature path
+        '''
+        if(self.args.pretrain_feature!='None' and self.args.data_folder_path.endswith('feature')==True):
             sample, label = torch.load(self.samples[index][0])[0],self.samples[index][1]
         else:
             sample, label = Image.open(self.samples[index][0]),self.samples[index][1]
@@ -179,7 +184,7 @@ def get_data_set_online(args):
     print("Number of all data is {}".format(len(all_Dataset)))
     n_experiences=args.timestamp
     all_timestamp_index=all_Dataset.get_timestamp_index()
-    train_transform,test_transform=get_transforms()
+    train_transform,test_transform=get_transforms(args)
 
     list_all_dataset = []
 

@@ -85,7 +85,7 @@ def extract_feature(args):
     feature_path=os.path.join(args.feature_path,'{}'.format(feature))
     class_list=args.class_list.split()
     if(os.path.isdir(feature_path)):
-        return 
+        return args
 
     # create feature folder
     os.makedirs(feature_path,exist_ok=True)
@@ -101,14 +101,16 @@ def extract_feature(args):
     model.eval()
     for index,item in enumerate(loader):
         if(index%500==0):
-            print('finished extract feature {}'.format(index))
+            print('finished extract {} {}'.format(args.pretrain_feature,index))
         image,class_=item
         image=image.cuda()
         class_=class_.cuda()
         timestamp=get_instance_time(args,index,all_timestamp_index)
         output=model(image).detach().cpu() #torch.Size([1, 1000])
-        target_path=os.path.join(feature_path,"bucket_"+str(timestamp),class_list[class_.detach().cpu().item()])
+        target_path=os.path.join(feature_path,"bucket_"+str(timestamp+1),class_list[class_.detach().cpu().item()])
         torch.save(output,os.path.join(target_path,'{}.pth'.format(index)))
+    return args
+
 
 
 

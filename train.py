@@ -72,18 +72,27 @@ method_query=args.method.split()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # torch.cuda.get_device_name(0)
 # torch.cuda.device_count() 
+'''
+Remember to delete the old feature path before generating new feature 
+'''
 if(args.pretrain_feature!='None'):
-    extract_feature(args)
+    args.temp_split=args.split
+    args.split='temp_folder' # dummy folder for extracting feature
+    args=extract_feature(args)
     print('Finished extract feature {}'.format(args.pretrain_feature))
+    args.split=args.temp_split
+    os.system('rm -rf ../temp_folder')
+    args.data_folder_path=os.path.join(args.feature_path,args.pretrain_feature)
 
 '''
 Move data from /data to /scratch (for trinity server)
 '''
 target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
 print('Moving data to local server')
-os.system('rm -rf {}'.format(target_path))
-os.makedirs(target_path,exist_ok=True)
-os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
+if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
+    os.system('rm -rf {}'.format(target_path))
+    os.makedirs(target_path,exist_ok=True)
+    os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
 args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
 
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:

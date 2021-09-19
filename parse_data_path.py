@@ -20,11 +20,16 @@ from sklearn.model_selection import train_test_split
 def list_all_files(args,rootdir):
     train_list,test_list,all_list = [],[],[]
     bucket_list = os.listdir(rootdir)
+    bucket_list=list(filter(lambda a: 'bucket_' in a,bucket_list))
+    if('bucket_0' in bucket_list):
+        bucket_list.remove('bucket_0') # skip bucket 0, since it's for pretrain feature
     classes_list=  os.listdir(osp.join(rootdir,bucket_list[0]))
     for bucket in bucket_list:
         for classes in classes_list:
             image_list=os.listdir(osp.join(rootdir,bucket,classes))
             image_list=list(map(lambda a: osp.join(osp.join(rootdir,bucket,classes,a)), image_list))
+            image_list=image_list[:args.num_instance_each_class] # if background class have more image, we use only part of it
+            assert len(image_list)==args.num_instance_each_class
             train_subset,test_subset=train_test_split(image_list,test_size=args.test_split, random_state=args.random_seed)
             train_list.extend(train_subset)
             test_list.extend(test_subset)
@@ -55,8 +60,6 @@ def parse_data_path(args):
                 if classes not in class_list:
                     continue
                 class_index=class_list.index(classes)
-                timestamp=name_list[-3].split('_')[-1] # since name is bucket_3
-                if(int(timestamp)==0): # skip bucket 0, since it's for moco feature
-                    continue
+                timestamp=name_list[-3].split('_')[-1] # since name is bucket_x
                 file.write(item+ " "+str(class_index)+" "+str(timestamp))
         print('{} parse path finish!'.format(stage))
