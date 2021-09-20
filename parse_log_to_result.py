@@ -1,5 +1,7 @@
 import os
 import numpy as np
+import argparse
+
 def get_offline_protocol_index(class_=10):
     eval_list={'offline':[],'online':[],'backward':[],'forward':[],'accuracy':[]}
     count=0
@@ -40,8 +42,13 @@ def get_online_protocol_index(class_=10):
     assert len(eval_list['forward'])==int(class_*(class_-1)/2)
     return eval_list
 
+argparser = argparse.ArgumentParser()
+argparser.add_argument("--split")
+argparser.add_argument("--nclass",type=int)
 
-logpath='../log/'
+args = argparser.parse_args()
+
+logpath='../{}/log/'.format(args.split)
 log_list=sorted(os.listdir(logpath))
 
 for name in log_list:
@@ -57,20 +64,18 @@ for name in log_list:
         if not line:
             break
     file.close()
-    if(len(result_list)!=100):
+    if(len(result_list)!=int(args.nclass*args.nclass)):
         if('online' in name):
-            assert np.sum(result_list[:10])==0
-            result_list=result_list[10:]
+            # assert np.max(result_list[:args.nclass])<0.3
+            result_list=result_list[args.nclass:]
         print("{} count of {}, with mean of {}".format(name,len(result_list), np.mean(result_list)))
     else:
         result_list=np.array(result_list)
         if('online' in name):
-            assert np.sum(result_list[:10])==0
-            index_list=get_online_protocol_index (class_=10)
+            # assert np.max(result_list[:args.nclass])<0.3
+            index_list=get_online_protocol_index(class_=args.nclass)
         else:
-            index_list=get_offline_protocol_index(class_=10)
-        # print(result_list)
-        print(result_list)
+            index_list=get_offline_protocol_index(class_=args.nclass)
         result_list=[str(np.mean(result_list[np.array(item[1])])) for item in index_list.items()]
         key_list=[item[0] for item in index_list.items()]
         print("{} with {} of {}".format(name,", ".join(key_list),", ".join(result_list)))

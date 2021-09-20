@@ -1,7 +1,7 @@
 from torchvision.transforms import Compose, ToTensor, Normalize, RandomCrop, RandomHorizontalFlip,Resize
 from torch.utils.data import Dataset,Subset,DataLoader
 import torchvision.transforms as transforms
-from torchvision.models import resnet18
+from torchvision.models import resnet18,resnet50
 import os
 import numpy as np
 from PIL import Image
@@ -80,8 +80,8 @@ def extract_feature(args):
     dataset,all_timestamp_index=get_feature_extract_loader(args)
     loader=DataLoader(dataset,batch_size=1,shuffle=False,collate_fn=collator)
     os.makedirs(args.feature_path,exist_ok=True)
-    
     feature=args.pretrain_feature
+    pre_dataset,pre_net,target_dataset,target_num= args.pretrain_feature.split('_')[:-1] # name like moco_resnet18_clear_10_feature
     feature_path=os.path.join(args.feature_path,'{}'.format(feature))
     class_list=args.class_list.split()
     if(os.path.isdir(feature_path)):
@@ -90,13 +90,20 @@ def extract_feature(args):
     # create feature folder
     os.makedirs(feature_path,exist_ok=True)
     for ii in range(1,args.timestamp+1):
-        os.makedirs(os.path.join(feature_path,str(ii)),exist_ok=True)
+        os.makedirs(os.path.join(feature_path,"bucket_"+str(ii)),exist_ok=True)
         for item in class_list:
             os.makedirs(os.path.join(feature_path,"bucket_"+str(ii),item),exist_ok=True)
 
     os.makedirs(feature_path,exist_ok=True)
-    model=resnet18(pretrained=False)
-    model=moco_v2_yfcc_sep16_bucket_0_gpu_4_resnet18(model)
+    if(pre_dataset=='moco' and pre_net=='resnet18'):
+        model=resnet18(pretrained=False)
+        model=moco_v2_yfcc_sep16_bucket_0_gpu_4_resnet18(model)
+    elif(pre_dataset=='moco' and pre_net=='resnet50'):
+        model=resnet50(pretrained=False)
+        model=moco_v2_yfcc_feb18_bucket_0_gpu_8(model)
+    else:
+        assert False, "Couldn't find a valid pretrain feature setting"
+
     model.cuda()
     model.eval()
     for index,item in enumerate(loader):

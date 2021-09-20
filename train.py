@@ -103,6 +103,11 @@ args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[
 # ['GDumb','Naive','JointTraining','Cumulative']
 for strate in method_query:
     for current_mode in ['offline','online']:
+        # skip previous train model if necessary
+        model_save_path='../{}/model/model_{}_{}.pth'.format(args.split,strate,current_mode)
+        if(os.path.isfile(model_save_path)):
+            print('Skip model {}'.format(model_save_path))
+            continue
         if(current_mode=='offline'):
             scenario = get_data_set_offline(args)
         else:
@@ -229,10 +234,6 @@ for strate in method_query:
         #     print('skipping {}'.format(strate))
         #     continue
         # TRAINING LOOP
-        model_save_path='../{}/model/model_{}__{}.pth'.format(args.split,strate,current_mode)
-        if(os.path.isfile(model_save_path)):
-            print('Skip model {}'.format(model_save_path))
-            continue
         print('Starting experiment...')
         results = []
         if(strate=='JointTraining' and current_mode=='offline'):
