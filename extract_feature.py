@@ -67,7 +67,6 @@ def collator(input_):
                                     std=[0.229, 0.224, 0.225])
     transform = transforms.Compose([
         transforms.Resize(224),
-        transforms.CenterCrop(224),
         transforms.ToTensor(),
         normalize,
     ])

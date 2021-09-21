@@ -4,7 +4,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --method 'Naive GDumb CWRStar Cumulative JointTraining LwF AGEM EWC SynapticIntelligence Replay CoPE' \
 --split  'clear10_moco_res50' \
 --restart '0' \
---nepoch 70 \
+--nepoch 100 \
 --step_schedular_decay 30 \
 --schedular_step 0.1 \
 --batch_size 64 \
