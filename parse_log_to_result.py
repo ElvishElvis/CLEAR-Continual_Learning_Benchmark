@@ -44,7 +44,7 @@ def get_online_protocol_index(class_=10):
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument("--split")
-argparser.add_argument("--nclass",type=int)
+argparser.add_argument("--timestamp",type=int,default=10)
 
 args = argparser.parse_args()
 
@@ -64,18 +64,19 @@ for name in log_list:
         if not line:
             break
     file.close()
-    if(len(result_list)!=int(args.nclass*args.nclass)):
+    if(len(result_list)!=int(args.timestamp*args.timestamp)):
         if('online' in name):
-            # assert np.max(result_list[:args.nclass])<0.3
-            result_list=result_list[args.nclass:]
+            # assert np.max(result_list[:args.timestamp])<0.3
+            result_list=result_list[args.timestamp:]
         print("{} count of {}, with mean of {}".format(name,len(result_list), np.mean(result_list)))
     else:
         result_list=np.array(result_list)
+        print(result_list)
         if('online' in name):
-            # assert np.max(result_list[:args.nclass])<0.3
-            index_list=get_online_protocol_index(class_=args.nclass)
+            # assert np.max(result_list[:args.timestamp])<0.3
+            index_list=get_online_protocol_index(class_=args.timestamp)
         else:
-            index_list=get_offline_protocol_index(class_=args.nclass)
+            index_list=get_offline_protocol_index(class_=args.timestamp)
         result_list=[str(np.mean(result_list[np.array(item[1])])) for item in index_list.items()]
         key_list=[item[0] for item in index_list.items()]
         print("{} with {} of {}".format(name,", ".join(key_list),", ".join(result_list)))

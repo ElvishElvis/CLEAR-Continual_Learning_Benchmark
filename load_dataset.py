@@ -9,6 +9,7 @@ from PIL import Image
 import torch
 from avalanche.benchmarks  import benchmark_with_validation_stream
 from parse_data_path import *
+from extract_feature import *
 '''
 timestamp_index stand for, for each timestamp, the index of instance in the big data folder, since each subset represent
 one timestamp data, thus we need to have the index of data of each timestamp
@@ -99,6 +100,8 @@ class CLEARDataset(Dataset):
                 array=np.concatenate((array, array, array), axis=-1)
             elif(len(array.shape)==2):
                 array=np.stack([array,array,array],axis=-1)
+            # import pdb;pdb.set_trace()
+            # array=np.ones(array.shape,dtype='uint8')*int(get_instance_time(self.args,index,self.timestamp_index)) # for debug
             sample=Image.fromarray(array)
         # result= array,label
         # np.save('./buffered_data/{}/{}'.format(self.stage,str(index)),result)
@@ -107,6 +110,9 @@ class CLEARSubset(Dataset):
     def __init__(self, dataset, indices, labels):
         self.dataset = torch.utils.data.Subset(dataset, indices)
         self.targets = labels
+        self.indices=indices
+    def get_indice(self):
+        return self.indices
     def __getitem__(self, idx):
         image = self.dataset[idx][0]
         target = self.targets[idx]
@@ -163,12 +169,32 @@ def get_data_set_offline(args):
         # # test_set=AvalancheDataset(test_sub)
         list_train_dataset.append(train_sub)
         list_test_dataset.append(test_sub)
+    # return ni_benchmark(
+    #     list_train_dataset, 
+    #     list_test_dataset, 
+    #     n_experiences=len(list_train_dataset), 
+    #     shuffle=False, 
+    #     balance_experiences=True,
+    #     train_transform=train_transform,
+    #     eval_transform=test_transform,
+    #     seed=args.random_seed)
+
+    # return nc_benchmark(
+    #     list_train_dataset,
+    #     list_test_dataset,
+    #     n_experiences=len(list_train_dataset),
+    #     task_labels=True,
+    #     shuffle=False,
+    #     train_transform=train_transform,
+    #     eval_transform=test_transform,
+    #     seed=args.random_seed)
+
     return nc_benchmark(
         list_train_dataset,
         list_test_dataset,
         n_experiences=len(list_train_dataset),
         task_labels=True,
-        shuffle=True,
+        shuffle=False,
         class_ids_from_zero_in_each_exp=True,
         one_dataset_per_exp=True,
         train_transform=train_transform,
@@ -195,21 +221,42 @@ def get_data_set_online(args):
         # choose a random permutation of the pixels in the image
         all_sub = CLEARSubset(all_Dataset,all_timestamp_index[i],all_Dataset.targets[i*split_num_all:(i+1)*split_num_all])
         list_all_dataset.append(all_sub)
+
+
+    # return ni_benchmark(
+    #     list_all_dataset, 
+    #     list_all_dataset, 
+    #     n_experiences=len(list_all_dataset), 
+    #     shuffle=False, 
+    #     balance_experiences=True,
+    #     train_transform=train_transform,
+    #     eval_transform=test_transform,
+    #     seed=args.random_seed)
+
+
+    # return nc_benchmark(
+    #     list_all_dataset,
+    #     list_all_dataset,
+    #     n_experiences=len(list_all_dataset),
+    #     task_labels=True,
+    #     shuffle=False,
+    #     class_ids_from_zero_in_each_exp=True,
+    #     one_dataset_per_exp=True,
+    #     train_transform=train_transform,
+    #     eval_transform=test_transform,
+    #     seed=args.random_seed)
+
     return nc_benchmark(
         list_all_dataset,
         list_all_dataset,
         n_experiences=len(list_all_dataset),
         task_labels=True,
-        shuffle=True,
+        shuffle=False,
         class_ids_from_zero_in_each_exp=True,
         one_dataset_per_exp=True,
         train_transform=train_transform,
         eval_transform=test_transform,
         seed=args.random_seed)
-
-
-
-
 
 if __name__ == '__main__':
     dataset=get_data_set_online()
