@@ -9,12 +9,15 @@ from PIL import Image
 import torch
 from avalanche.benchmarks  import benchmark_with_validation_stream
 from parse_data_path import *
-from extract_feature import *
 '''
 timestamp_index stand for, for each timestamp, the index of instance in the big data folder, since each subset represent
 one timestamp data, thus we need to have the index of data of each timestamp
 '''
-
+def get_instance_time(args,idx,all_timestamp_index):
+    for index,list in enumerate(all_timestamp_index):
+        if(idx in list):
+            return index
+    assert False, "couldn't find timestamp info for data with index {}".format(idx)
 
 def get_feature_extract_loader(args):
     dataset=CLEARDataset(args,data_txt_path='../{}/data_cache/data_all_path.txt'.format(args.split),stage='all')
@@ -257,7 +260,7 @@ def get_data_set_online(args):
         train_transform=train_transform,
         eval_transform=test_transform,
         seed=args.random_seed)
-
+    
 if __name__ == '__main__':
     dataset=get_data_set_online()
     import pdb;pdb.set_trace()

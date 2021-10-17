@@ -186,7 +186,7 @@ for strate in method_query:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = EWC(
                 model, optimizer,
-                CrossEntropyLoss(), ewc_lambda=0.4, mode='separate',decay_factor=0.1,
+                CrossEntropyLoss(), ewc_lambda=0.4, mode='online',decay_factor=0.1,
                 train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif strate=='Naive':

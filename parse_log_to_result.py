@@ -45,6 +45,7 @@ def get_online_protocol_index(class_=10):
 argparser = argparse.ArgumentParser()
 argparser.add_argument("--split")
 argparser.add_argument("--timestamp",type=int,default=10)
+argparser.add_argument("--verbose",type=int,default=0)
 
 args = argparser.parse_args()
 
@@ -71,7 +72,8 @@ for name in log_list:
         print("{} count of {}, with mean of {}".format(name,len(result_list), np.mean(result_list)))
     else:
         result_list=np.array(result_list)
-        print(result_list)
+        if(args.verbose==1):
+            print(result_list)
         if('online' in name):
             # assert np.max(result_list[:args.timestamp])<0.3
             index_list=get_online_protocol_index(class_=args.timestamp)
