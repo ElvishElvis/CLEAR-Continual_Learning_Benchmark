@@ -1,7 +1,7 @@
 CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --data_folder_path '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images' \
 --class_list 'NEGATIVE baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
---method 'Naive GDumb CWRStar Cumulative JointTraining LwF AGEM EWC SynapticIntelligence Replay' \
+--method 'Naive GDumb CWRStar Cumulative JointTraining LwF EWC SynapticIntelligence Replay AGEM' \
 --split  'clear10_moco' \
 --restart '0' \
 --nepoch 70 \
