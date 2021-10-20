@@ -150,12 +150,20 @@ for strate in method_query:
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch*args.timestamp, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+        # stanard gdumb= reset model+ class_balance buffer'
         elif strate=='GDumb':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
-                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=data_count)
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=data_count,reset=True,buffer='class_balance')
+        # this is basically the 'reservoir sampling in the paper(no reset+ reservoir sampling'
+        elif strate=='reservoir':
+            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
+            cl_strategy = GDumb(
+                model, optimizer,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=data_count,reset=False,buffer='reservoir_sampling')
         elif strate=='Cumulative':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Cumulative(
