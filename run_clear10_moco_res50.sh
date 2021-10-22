@@ -1,7 +1,8 @@
 CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --data_folder_path '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images' \
 --class_list 'NEGATIVE baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
---method 'BiasReservoir Reservoir GDumb Naive CWRStar Cumulative JointTraining LwF EWC SynapticIntelligence Replay AGEM' \
+--method 'BiasReservoir_Dynamic_1.0 BiasReservoir_Dynamic_0.75 BiasReservoir_Dynamic_0.5 BiasReservoir_Dynamic_0.25 
+BiasReservoir_Fixed_0.5 BiasReservoir_Fixed_1.0 BiasReservoir_Fixed_2.0 BiasReservoir_Fixed_5.0 Reservoir' \
 --split  'clear10_moco_res50' \
 --restart '0' \
 --nepoch 70 \

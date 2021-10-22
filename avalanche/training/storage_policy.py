@@ -104,8 +104,10 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         assert alpha_mode in ['Fixed','Dynamic']
         self.alpha_mode=alpha_mode
         self.alpha_value=alpha_value
+        self.buffer_index_list=[]
+        self.history_data=AvalancheConcatDataset([])
         # INVARIANT: _buffer_weights is always sorted.
-        self._buffer_weights = torch.zeros(0)
+        # self._buffer_weights = torch.zeros(0)
 
 
     def update(self, strategy: 'BaseStrategy', **kwargs):
@@ -114,24 +116,38 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         self.update_from_dataset(strategy.experience.dataset)
 
     def update_from_dataset(self, new_data: AvalancheDataset):
-        if(self.alpha_mode=='Fixed'):
-            # alpha*k/n= alpha*k/k*i=alpha/i
-            weight=self.alpha_value/(self.current_experience_id+1)
-        elif (self.alpha_mode=='Dynamic'):
-            weight=self.alpha_value
+        # import pdb;pdb.set_trace()
+        new_items_to_add_to_buffer=[]
+        # print(new_data._indices)
+        # print(self.buffer_index_list)
+        for index in new_data._indices:
+            if(len(self.buffer_index_list)<self.max_size):
+                self.buffer_index_list.append(index)
+            else:
+                if(self.alpha_mode=='Fixed'):
+                    # alpha*k/n= alpha*k/k*i=alpha/i
+                    prob=self.alpha_value/(self.current_experience_id+1)
+                elif (self.alpha_mode=='Dynamic'):
+                    prob=self.alpha_value
+                if random.random() <= prob:
+                    new_items_to_add_to_buffer.append(index)
+        random.shuffle(self.buffer_index_list)
+        self.buffer_index_list=self.buffer_index_list[:len(self.buffer_index_list) - len(new_items_to_add_to_buffer)]
+        self.buffer_index_list+=new_items_to_add_to_buffer
         print('Using bias_reservoir_sampling')
         print("alpha_mode {} ".format(self.alpha_mode))
         print("alpha_value {} ".format(self.alpha_value))
-        print("weight {} ".format(weight))
-
-        new_weights = torch.rand(len(new_data))**(1/weight)
-        cat_weights = torch.cat([new_weights, self._buffer_weights])
-        cat_data = AvalancheConcatDataset([new_data, self.buffer])
-        sorted_weights, sorted_idxs = cat_weights.sort(descending=True)
-
-        buffer_idxs = sorted_idxs[:self.max_size]
-        self.buffer = AvalancheSubset(cat_data, buffer_idxs)
-        self._buffer_weights = sorted_weights[:self.max_size]
+        assert len(self.buffer_index_list)==self.max_size
+        self.history_data=AvalancheConcatDataset([new_data, self.history_data])
+        self.buffer = AvalancheSubset(self.history_data, self.buffer_index_list)
+        # for index in range(self.max_size):
+        # new_weights = torch.rand(len(new_data))**(1/weight)
+        # cat_weights = torch.cat([new_weights, self._buffer_weights])
+        
+        # sorted_weights, sorted_idxs = cat_weights.sort(descending=True)
+        # buffer_idxs = sorted_idxs[:self.max_size]
+        
+        # self._buffer_weights = sorted_weights[:self.max_size]
 
     def resize(self, strategy, new_size):
         """ Update the maximum size of the buffer. """
@@ -139,7 +155,6 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         if len(self.buffer) <= self.max_size:
             return
         self.buffer = AvalancheSubset(self.buffer, torch.arange(self.max_size))
-        self._buffer_weights = self._buffer_weights[:self.max_size]
 
 
 
