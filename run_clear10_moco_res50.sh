@@ -1,10 +1,10 @@
 CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --data_folder_path '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images' \
 --class_list 'NEGATIVE baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
---method 'reservoir GDumb Naive CWRStar Cumulative JointTraining LwF EWC SynapticIntelligence Replay AGEM' \
+--method 'BiasReservoir Reservoir GDumb Naive CWRStar Cumulative JointTraining LwF EWC SynapticIntelligence Replay AGEM' \
 --split  'clear10_moco_res50' \
 --restart '0' \
---nepoch 30 \
+--nepoch 70 \
 --step_schedular_decay 60 \
 --schedular_step 0.1 \
 --batch_size 64 \
