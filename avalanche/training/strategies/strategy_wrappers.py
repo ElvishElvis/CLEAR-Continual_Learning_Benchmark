@@ -362,7 +362,7 @@ class AGEM(BaseStrategy):
                  train_mb_size: int = 1, train_epochs: int = 1,
                  eval_mb_size: int = None, device=None,
                  plugins: Optional[List[StrategyPlugin]] = None,
-                 evaluator: EvaluationPlugin = default_logger, eval_every=-1):
+                 evaluator: EvaluationPlugin = default_logger, eval_every=-1,reservoir=False):
         """ Average Gradient Episodic Memory (A-GEM) strategy.
             See AGEM plugin for details.
             This strategy does not use task identities.
@@ -389,7 +389,7 @@ class AGEM(BaseStrategy):
                     of all the epochs for a single experience.
         """
 
-        agem = AGEMPlugin(patterns_per_exp, sample_size)
+        agem = AGEMPlugin(patterns_per_exp, sample_size,reservoir=reservoir)
         if plugins is None:
             plugins = [agem]
         else:

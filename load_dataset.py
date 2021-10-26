@@ -36,6 +36,8 @@ class CLEARDataset(Dataset):
         if(os.path.isfile(data_txt_path)==False):
             print('loading data_list from folder')
             parse_data_path(args)
+        else:
+            print('loaded exist data_list')
         self.prepare_data(data_txt_path)
         self.targets=torch.from_numpy(np.array(self.targets))
         print('Using split {}'.format(self.args.split))

@@ -1,13 +1,15 @@
 import random
 
 import torch
+import math
 from torch.utils.data import random_split, DataLoader
 
-from avalanche.benchmarks.utils import AvalancheConcatDataset
+from avalanche.benchmarks.utils import AvalancheConcatDataset,AvalancheDataset, AvalancheSubset
 from avalanche.benchmarks.utils.data_loader import GroupBalancedDataLoader, \
     GroupBalancedInfiniteDataLoader
 from avalanche.models import avalanche_forward
 from avalanche.training.plugins.strategy_plugin import StrategyPlugin
+from avalanche.training.storage_policy import ReservoirSamplingBuffer
 
 
 class AGEMPlugin(StrategyPlugin):
@@ -20,7 +22,7 @@ class AGEMPlugin(StrategyPlugin):
     This plugin does not use task identities.
     """
 
-    def __init__(self, patterns_per_experience: int, sample_size: int):
+    def __init__(self, patterns_per_experience: int, sample_size: int,reservoir:bool=False):
         """
         :param patterns_per_experience: number of patterns per experience in the
             memory.
@@ -39,19 +41,39 @@ class AGEMPlugin(StrategyPlugin):
 
         self.reference_gradients = None
         self.memory_x, self.memory_y = None, None
+        if(reservoir==True):
+            print('using AGEM-fixed with reservoir sampling')
+            self.reservoir_buffer=ReservoirSamplingBuffer(self.sample_size)
+            self.reservoir=True
+        else:
+            print('not using reservoir sampling')
+            self.reservoir=False
+
 
     def before_training_iteration(self, strategy, **kwargs):
         """
         Compute reference gradient on memory sample.
         """
+        # print('buffer')
+        # print(len(self.buffers))
+        # if(len(self.buffers)>0):
+            # print(len(self.buffers[0]))
         if len(self.buffers) > 0:
             strategy.model.train()
             strategy.optimizer.zero_grad()
             mb = self.sample_from_memory()
             xref, yref, tid = mb[0], mb[1], mb[-1]
-            xref, yref = xref.to(strategy.device), yref.to(strategy.device)
-
-            out = avalanche_forward(strategy.model, xref, tid)
+            batch_size=16
+            iteration=math.ceil(tid.shape[0]/batch_size)
+            # split (out = avalanche_forward(strategy.model, xref, tid)) into different iteration
+            out=torch.tensor([]).cuda()
+            for itera in range(iteration):
+                xref_sub= xref[itera*batch_size:(itera+1)*batch_size]
+                xref_sub=xref_sub.to(strategy.device)
+                out_sub = avalanche_forward(strategy.model, xref_sub, tid[itera*batch_size:(itera+1)*batch_size])
+                out=torch.cat([out,out_sub])
+            
+            yref=yref.to(strategy.device)
             loss = strategy._criterion(out, yref)
             loss.backward()
             self.reference_gradients = [
@@ -110,7 +132,12 @@ class AGEMPlugin(StrategyPlugin):
             dataset, _ = random_split(dataset,
                                       [self.patterns_per_experience,
                                        removed_els])
-        self.buffers.append(dataset)
+        # use reservoir sampling to keep the buffer size= self.patterns_per_experience
+        if(self.reservoir==True and len(self.buffers)!=0):
+            self.reservoir_buffer.update_from_dataset(dataset)
+            self.buffers[0]=self.reservoir_buffer.buffer
+        else:
+            self.buffers.append(dataset)
         self.buffer_dataloader = GroupBalancedInfiniteDataLoader(
             self.buffers,
             batch_size=self.sample_size // len(self.buffers),

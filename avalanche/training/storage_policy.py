@@ -119,7 +119,6 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         # import pdb;pdb.set_trace()
         new_items_to_add_to_buffer=[]
         # print(new_data._indices)
-        # print(self.buffer_index_list)
         for index in new_data._indices:
             if(len(self.buffer_index_list)<self.max_size):
                 self.buffer_index_list.append(index)
@@ -134,11 +133,12 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         random.shuffle(self.buffer_index_list)
         self.buffer_index_list=self.buffer_index_list[:len(self.buffer_index_list) - len(new_items_to_add_to_buffer)]
         self.buffer_index_list+=new_items_to_add_to_buffer
+        random.shuffle(self.buffer_index_list)
         print('Using bias_reservoir_sampling')
         print("alpha_mode {} ".format(self.alpha_mode))
         print("alpha_value {} ".format(self.alpha_value))
         assert len(self.buffer_index_list)==self.max_size
-        self.history_data=AvalancheConcatDataset([new_data, self.history_data])
+        self.history_data=AvalancheConcatDataset([self.history_data,new_data])
         self.buffer = AvalancheSubset(self.history_data, self.buffer_index_list)
         # for index in range(self.max_size):
         # new_weights = torch.rand(len(new_data))**(1/weight)
@@ -258,13 +258,18 @@ class ExperienceBalancedBuffer(BalancedExemplarsBuffer):
         super().__init__(max_size, adaptive_size, num_experiences)
 
     def update(self, strategy: "BaseStrategy", **kwargs):
+        
         new_data = strategy.experience.dataset
         num_exps = strategy.clock.train_exp_counter + 1
         lens = self.get_group_lengths(num_exps)
-
+        # print(len(new_data))
+        # print(num_exps)
+        # print(lens)
         new_buffer = ReservoirSamplingBuffer(lens[-1])
         new_buffer.update_from_dataset(new_data)
+        # print(len(new_buffer.buffer))
         self.buffer_groups[num_exps - 1] = new_buffer
+        # print(self.buffer_groups.keys())
 
         for ll, b in zip(lens, self.buffer_groups.values()):
             b.resize(strategy, ll)

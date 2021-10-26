@@ -65,6 +65,7 @@ class GDumbPlugin(StrategyPlugin):
 
     def before_train_dataset_adaptation(self, strategy: 'BaseStrategy',
                                         **kwargs):
+        print('reset is {}'.format(self.reset==True))
         if self.reset==True:
             """ Reset model. """
             if self.init_model is None:
