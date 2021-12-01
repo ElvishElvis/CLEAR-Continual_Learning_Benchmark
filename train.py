@@ -20,6 +20,7 @@ from parse_data_path import *
 import argparse
 from get_config import *
 from extract_feature import *
+from parse_log_to_result import *
                        
 def build_logger(name):
     # log to text file
@@ -99,8 +100,11 @@ if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))
     os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
 args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
 
+
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
 # ['GDumb','Naive','JointTraining','Cumulative']
+with open('../{}/args.txt'.format(args.split), 'w') as f:
+    print('args', args, file=f) # direct args to file
 for strate in method_query:
     for current_mode in ['offline','online']:
         # skip previous train model if necessary
@@ -120,7 +124,7 @@ for strate in method_query:
         if args.pretrain_feature=='None':
             model=resnet18(pretrained=False) 
         else:
-            model=nn.Linear(1000,args.num_classes)
+            model=nn.Linear(2048,args.num_classes)
         data_count=int(args.num_classes*args.num_instance_each_class) if current_mode=='online' else int(args.num_classes*args.num_instance_each_class*(1-args.test_split))
         print('data_count is {}'.format(data_count))
         if(strate.split("_")[-1].isnumeric()==False):
@@ -136,6 +140,8 @@ for strate in method_query:
             model=model.cuda()
         optimizer=SGD(model.parameters(), lr=args.start_lr, weight_decay=args.weight_decay,momentum=args.momentum)
         scheduler= make_scheduler(optimizer,args.step_schedular_decay,args.schedular_step)
+        
+
         if strate=='CWRStar':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = CWRStar(
@@ -152,7 +158,7 @@ for strate in method_query:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = JointTraining(
                 model, optimizer,
-                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch*args.timestamp, eval_mb_size=args.batch_size,
+                CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch*args.timestamp//3, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
         elif 'GDumbFinetune' in strate:
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
@@ -168,13 +174,17 @@ for strate in method_query:
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=buffer_size,reset=True,buffer='class_balance')
         elif 'BiasReservoir' in strate:
+            if('reset' in strate):
+                resett=True
+            else:
+                resett=False
             alpha_mode ='Dynamic' if 'Dynamic' in strate else 'Fixed'
             alpha_value=float(strate.split("_")[-1])
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
-                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=buffer_size,reset=False,buffer='bias_reservoir_sampling',
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=buffer_size,reset=resett,buffer='bias_reservoir_sampling',
                 alpha_mode=alpha_mode,alpha_value=alpha_value)
         # this is basically the 'reservoir sampling in the paper(no reset+ reservoir sampling'
         elif 'Reservoir' in strate:
@@ -183,12 +193,16 @@ for strate in method_query:
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],mem_size=buffer_size,reset=False,buffer='reservoir_sampling')
-        elif strate=='Cumulative':
+        elif 'Cumulative' in strate:
+            if('reset' in strate):
+                resett=True
+            else:
+                resett=False
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Cumulative(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
-                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)])
+                evaluator=eval_plugin,device=device,plugins=[LRSchedulerPlugin(scheduler)],reset=resett)
         elif strate=='LwF':
             text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = LwF(
@@ -300,6 +314,11 @@ for strate in method_query:
                     print('Training completed')
                     print('current strate is {} {}'.format(strate,current_mode))
                 torch.save(model.state_dict(), model_save_path)
+                log_path='../{}/log/'.format(args.split)
+                log_name='log_{}.txt'.format("{}_{}".format(strate,current_mode))
+                move_metric_to_main_node(log_path,log_name,main_server_path='/data/jiashi/metric')
+
+
                 
             
             

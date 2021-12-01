@@ -1,10 +1,7 @@
 CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train.py \
 --data_folder_path '/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images' \
 --class_list 'NEGATIVE baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
---method 'AGEMFixed GDumbFinetune JointTraining Cumulative 
-AGEMFixed_200 AGEMFixed_500 AGEMFixed_1500 
-GDumbFinetune_200 GDumbFinetune_500 GDumbFinetune_1500
-Replay_200 Replay_500 Replay_1500'  \
+--method 'Cumulative JointTraining'  \
 --split  'clear10' \
 --restart '0' \
 --nepoch 70 \

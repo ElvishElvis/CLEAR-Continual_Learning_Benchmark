@@ -16,7 +16,7 @@ class Cumulative(BaseStrategy):
                  train_mb_size: int = 1, train_epochs: int = 1,
                  eval_mb_size: int = None, device=None,
                  plugins: Optional[List[StrategyPlugin]] = None,
-                 evaluator: EvaluationPlugin = default_logger, eval_every=-1):
+                 evaluator: EvaluationPlugin = default_logger, eval_every=-1,reset=False):
         """ Cumulative strategy. At each experience,
             train model with data from all previous experiences and current
             experience.
@@ -45,9 +45,18 @@ class Cumulative(BaseStrategy):
             train_mb_size=train_mb_size, train_epochs=train_epochs,
             eval_mb_size=eval_mb_size, device=device, plugins=plugins,
             evaluator=evaluator, eval_every=eval_every)
+        self.reset=reset
 
         self.dataset = None  # cumulative dataset
-
+    # def before_train_dataset_adaptation(self, strategy: 'BaseStrategy',
+    #                                     **kwargs):
+    #     print('reset is {}'.format(self.reset==True))
+    #     if self.reset==True:
+    #         """ Reset model. """
+    #         if self.init_model is None:
+    #             self.init_model = copy.deepcopy(strategy.model)
+    #         else:
+    #             strategy.model = copy.deepcopy(self.init_model)
     def train_dataset_adaptation(self, **kwargs):
         """
             Concatenates all the previous experiences.

@@ -63,19 +63,19 @@ class AGEMPlugin(StrategyPlugin):
             strategy.optimizer.zero_grad()
             mb = self.sample_from_memory()
             xref, yref, tid = mb[0], mb[1], mb[-1]
-            batch_size=16
+            batch_size=64
             iteration=math.ceil(tid.shape[0]/batch_size)
             # split (out = avalanche_forward(strategy.model, xref, tid)) into different iteration
-            out=torch.tensor([]).cuda()
             for itera in range(iteration):
                 xref_sub= xref[itera*batch_size:(itera+1)*batch_size]
+                tid_sub=tid[itera*batch_size:(itera+1)*batch_size]
+                yref_sub=yref[itera*batch_size:(itera+1)*batch_size]
                 xref_sub=xref_sub.to(strategy.device)
-                out_sub = avalanche_forward(strategy.model, xref_sub, tid[itera*batch_size:(itera+1)*batch_size])
-                out=torch.cat([out,out_sub])
-            
-            yref=yref.to(strategy.device)
-            loss = strategy._criterion(out, yref)
-            loss.backward()
+                out_sub = avalanche_forward(strategy.model, xref_sub,tid_sub)
+                yref_sub=yref_sub.to(strategy.device)
+                loss = strategy._criterion(out_sub, yref_sub)
+                loss.backward()
+                del xref_sub, out_sub,yref_sub
             self.reference_gradients = [
                 p.grad.view(-1) for n, p
                 in strategy.model.named_parameters() if p.requires_grad]
