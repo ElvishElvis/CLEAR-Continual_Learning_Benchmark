@@ -119,6 +119,7 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         # import pdb;pdb.set_trace()
         new_items_to_add_to_buffer=[]
         # print(new_data._indices)
+        # import pdb;pdb.set_trace()
         for index in new_data._indices:
             if(len(self.buffer_index_list)<self.max_size):
                 self.buffer_index_list.append(index)
@@ -126,14 +127,17 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
                 if(self.alpha_mode=='Fixed'):
                     # alpha*k/n= alpha*k/k*i=alpha/i
                     prob=self.alpha_value/(self.current_experience_id+1)
+                    # print(prob,self.alpha_value,self.current_experience_id+1)
                 elif (self.alpha_mode=='Dynamic'):
                     prob=self.alpha_value
                 if random.random() <= prob:
                     new_items_to_add_to_buffer.append(index)
+        # print('id'+str(self.current_experience_id+1))
+        # print(len(self.buffer_index_list))
+        # print(len(new_items_to_add_to_buffer))
         random.shuffle(self.buffer_index_list)
         self.buffer_index_list=self.buffer_index_list[:len(self.buffer_index_list) - len(new_items_to_add_to_buffer)]
         self.buffer_index_list+=new_items_to_add_to_buffer
-        random.shuffle(self.buffer_index_list)
         print('Using bias_reservoir_sampling')
         print("alpha_mode {} ".format(self.alpha_mode))
         print("alpha_value {} ".format(self.alpha_value))

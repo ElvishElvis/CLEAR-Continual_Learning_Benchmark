@@ -232,6 +232,7 @@ class BaseStrategy:
 
     def criterion(self):
         """ Loss function. """
+        # import pdb;pdb.set_trace()
         return self._criterion(self.mb_output, self.mb_y)
 
     def train(self, experiences: Union[Experience, Sequence[Experience]],
@@ -481,6 +482,7 @@ class BaseStrategy:
         :return:
         """
         for self.mbatch in self.dataloader:
+            # self.dataloader._dl.datasets[0]._indices
             if self._stop_training:
                 break
 

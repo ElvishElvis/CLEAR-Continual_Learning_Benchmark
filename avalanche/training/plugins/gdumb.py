@@ -72,6 +72,8 @@ class GDumbPlugin(StrategyPlugin):
                 self.init_model = copy.deepcopy(strategy.model)
             else:
                 strategy.model = copy.deepcopy(self.init_model)
+            # import pdb;pdb.set_trace()
+            # strategy.model_adaptation(self.init_model)
 
     def after_train_dataset_adaptation(self, strategy: "BaseStrategy",
                                        **kwargs):

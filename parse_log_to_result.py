@@ -11,7 +11,7 @@ def move_metric_to_main_node(log_path,log_name,main_server_path='/data/jiashi/me
 
 
 def get_offline_protocol_index(class_=10):
-    eval_list={'offline':[],'online':[],'backward':[],'forward':[],'accuracy':[]}
+    eval_list={'offline':[],'online':[],'accuracy':[],'backward':[],'forward':[]}
     count=0
     for i in range(class_):
         for k in range(class_):
