@@ -125,7 +125,7 @@ for strate in method_query:
         if args.pretrain_feature=='None':
             model=resnet18(pretrained=False) 
         else:
-            model=nn.Linear(2048,1000)
+            model=nn.Linear(2048,11)
         data_count=int(args.num_classes*args.num_instance_each_class) if current_mode=='online' else int(args.num_classes*args.num_instance_each_class*(1-args.test_split))
         print('data_count is {}'.format(data_count))
         if(strate.split("_")[-1].isnumeric()==False):

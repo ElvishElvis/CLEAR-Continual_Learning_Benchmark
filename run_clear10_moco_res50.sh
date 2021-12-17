@@ -11,7 +11,7 @@ Cumulative GDumb CWRStar JointTraining LwF EWC SynapticIntelligence Replay AGEMF
 GDumbFinetune'  \
 --split  'clear10_moco_res50' \
 --restart '0' \
---nepoch 100 \
+--nepoch 10 \
 --step_schedular_decay 60 \
 --schedular_step 0.1 \
 --batch_size 256 \

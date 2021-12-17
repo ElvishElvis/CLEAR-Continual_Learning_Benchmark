@@ -19,6 +19,7 @@ from avalanche.benchmarks.scenarios import Experience
 from avalanche.benchmarks.utils import AvalancheConcatDataset
 from avalanche.training.plugins.evaluation import default_logger
 from avalanche.training.strategies import BaseStrategy
+from avalanche.models import DynamicModule
 
 if TYPE_CHECKING:
     from avalanche.training.plugins import StrategyPlugin
@@ -29,22 +30,25 @@ class AlreadyTrainedError(Exception):
 
 
 class JointTraining(BaseStrategy):
+    """ Joint training on the entire stream.
+
+    JointTraining performs joint training (also called offline training) on
+    the entire stream of data. This means that it is not a continual
+    learning strategy but it can be used as an "offline" upper bound for
+    them.
+
+    .. warnings also::
+        Currently :py:class:`JointTraining` adapts its own dataset.
+        Please check that the plugins you are using do not implement
+        :py:meth:`adapt_trainin_dataset`. Otherwise, they are incompatible
+        with :py:class:`JointTraining`.
+    """
     def __init__(self, model: Module, optimizer: Optimizer, criterion,
                  train_mb_size: int = 1, train_epochs: int = 1,
                  eval_mb_size: int = 1, device='cpu',
                  plugins: Optional[Sequence['StrategyPlugin']] = None,
-                 evaluator=default_logger):
-        """
-        JointTraining performs joint training (also called offline training) on
-        the entire stream of data. This means that it is not a continual
-        learning strategy but it can be used as an "offline" upper bound for
-        them.
-
-        .. warnings also::
-            Currently :py:class:`JointTraining` adapts its own dataset.
-            Please check that the plugins you are using do not implement
-            :py:meth:`adapt_trainin_dataset`. Otherwise, they are incompatible
-            with :py:class:`JointTraining`.
+                 evaluator=default_logger, eval_every=-1):
+        """Init.
 
         :param model: PyTorch model.
         :param optimizer: PyTorch optimizer.
@@ -56,9 +60,22 @@ class JointTraining(BaseStrategy):
         :param plugins: (optional) list of StrategyPlugins.
         :param evaluator: (optional) instance of EvaluationPlugin for logging
             and metric computations. None to remove logging.
-        """
-        super().__init__(model, optimizer, criterion, train_mb_size,
-                         train_epochs, eval_mb_size, device, plugins, evaluator)
+        :param eval_every: the frequency of the calls to `eval` inside the
+            training loop. -1 disables the evaluation. 0 means `eval` is called
+            only at the end of the learning experience. Values >0 mean that 
+            `eval` is called every `eval_every` epochs and at the end of the 
+            learning experience.        """
+        super().__init__(model=model,
+                         optimizer=optimizer,
+                         criterion=criterion,
+                         train_mb_size=train_mb_size,
+                         train_epochs=train_epochs,
+                         eval_mb_size=eval_mb_size,
+                         device=device,
+                         plugins=plugins,
+                         evaluator=evaluator,
+                         eval_every=eval_every
+                         )
         # JointTraining can be trained only once.
         self._is_fitted = False
 
@@ -100,13 +117,13 @@ class JointTraining(BaseStrategy):
                 eval_streams[i] = [exp]
 
         self._experiences = experiences
-        self.before_training(**kwargs)
+        self._before_training(**kwargs)
         for exp in experiences:
             self.train_exp(exp, eval_streams, **kwargs)
             # Joint training only needs a single step because
             # it concatenates all the data at once.
             break
-        self.after_training(**kwargs)
+        self._after_training(**kwargs)
 
         res = self.evaluator.get_last_metrics()
         self._is_fitted = True
@@ -120,6 +137,18 @@ class JointTraining(BaseStrategy):
                                                exp.dataset])
             self.adapted_dataset = cat_data
         self.adapted_dataset = self.adapted_dataset.train()
+
+    def model_adaptation(self, model=None):
+        """ Adapts strategy's model for all experiences. """
+        if model is None:
+            model = self.model
+
+        for experience in self._experiences:
+            for module in model.modules():
+                if isinstance(module, DynamicModule):
+                    module.adaptation(experience.dataset)
+            model = model.to(self.device)
+        return model
 
 
 __all__ = ['JointTraining']

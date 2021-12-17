@@ -6,7 +6,7 @@ from avalanche.training.plugins import StrategyPlugin
 
 class LoadBestPlugin(StrategyPlugin):
     def __init__(self, val_stream_name: str,
-                 metric_name: str = 'Top1_Acc_Stream', mode: str = 'max'):
+                 metric_name: str = 'Top1_Acc_Epoch', mode: str = 'max'):
         """
         Load the best model after the training epochs finishs
 
@@ -21,12 +21,13 @@ class LoadBestPlugin(StrategyPlugin):
         super().__init__()
         self.val_stream_name = val_stream_name
         self.metric_name = metric_name
-        self.metric_key = f'{self.metric_name}/eval_phase/' \
+        self.metric_key = f'{self.metric_name}/train_phase/' \
                           f'{self.val_stream_name}'
         if mode not in ('max', 'min'):
             raise ValueError(f'Mode must be "max" or "min", got {mode}.')
         self.operator = operator.gt if mode == 'max' else operator.lt
-
+        # Top1_Acc_Exp/eval_phase/test_stream/
+        # Top1_Acc_Epoch/train_phase/train_stream/
         self.best_state = None  # Contains the best parameters
         self.best_val = None
         self.best_epoch = None
@@ -39,13 +40,19 @@ class LoadBestPlugin(StrategyPlugin):
     def before_training_epoch(self, strategy, **kwargs):
         self._update_best(strategy)
 
-    def after_training_epoch(self,strategy,**kwargs):
+    def before_eval(self,strategy,**kwargs):
         strategy.model.load_state_dict(self.best_state)
+        print('###########################################################')
+        print('Loading best model from epoch {} with acc {}'.format(self.best_epoch,self.best_val))
+        print('###########################################################')
 
     def _update_best(self, strategy):
         res = strategy.evaluator.get_last_metrics()
         val_acc = res.get(self.metric_key)
         if self.best_val is None or self.operator(val_acc, self.best_val):
+            print('###########################################################')
+            print(self.best_val)
+            print()
             self.best_state = deepcopy(strategy.model.state_dict())
             self.best_val = val_acc
             self.best_epoch = strategy.clock.train_exp_epochs

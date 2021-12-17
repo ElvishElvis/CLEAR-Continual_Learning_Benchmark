@@ -45,7 +45,6 @@ class MeanScores(Metric):
     """
 
     def __init__(self):
-        super().__init__()
         self.label2mean: Dict[int, Mean] = defaultdict(Mean)
         self.reset()
 
@@ -303,9 +302,9 @@ def mean_scores_metrics(
 
 
 __all__ = [
-    mean_scores_metrics,
-    MeanScoresTrainPluginMetric,
-    MeanScoresEvalPluginMetric,
-    MeanScores,
-    MeanNewOldScores,
+    'mean_scores_metrics',
+    'MeanScoresTrainPluginMetric',
+    'MeanScoresEvalPluginMetric',
+    'MeanScores',
+    'MeanNewOldScores'
 ]
