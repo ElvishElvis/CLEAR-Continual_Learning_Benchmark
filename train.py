@@ -33,10 +33,10 @@ def build_logger(name):
     eval_plugin = EvaluationPlugin(
         accuracy_metrics(minibatch=True, epoch=True, experience=True, stream=True),
         loss_metrics(minibatch=True, epoch=True, experience=True, stream=True),
-        timing_metrics(epoch=True, epoch_running=True),
+        # timing_metrics(epoch=True, epoch_running=True),
         forgetting_metrics(experience=True, stream=True),
         # cpu_usage_metrics(experience=True),
-        confusion_matrix_metrics(num_classes=scenario.n_classes, save_image=False,
+        confusion_matrix_metrics(num_classes=args.num_classes, save_image=False,
                                  stream=True),
         # disk_usage_metrics(minibatch=True, epoch=True, experience=True, stream=True),
         loggers=[interactive_logger, text_logger, tb_logger]
@@ -107,7 +107,7 @@ args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[
 with open('../{}/args.txt'.format(args.split), 'w') as f:
     print('args', args, file=f) # direct args to file
 for strate in method_query:
-    for current_mode in ['offline','online']:
+    for current_mode in ['offline']:
         # skip previous train model if necessary
         model_save_path='../{}/model/model_{}_{}.pth'.format(args.split,strate,current_mode)
         if(os.path.isfile(model_save_path)):
@@ -125,7 +125,7 @@ for strate in method_query:
         if args.pretrain_feature=='None':
             model=resnet18(pretrained=False) 
         else:
-            model=nn.Linear(2048,11)
+            model=nn.Linear(2048,args.num_classes)
         data_count=int(args.num_classes*args.num_instance_each_class) if current_mode=='online' else int(args.num_classes*args.num_instance_each_class*(1-args.test_split))
         print('data_count is {}'.format(data_count))
         if(strate.split("_")[-1].isnumeric()==False):
@@ -143,35 +143,31 @@ for strate in method_query:
         scheduler= make_scheduler(optimizer,args.step_schedular_decay,args.schedular_step)
         # patience=5 # Number of epochs to wait without generalization improvements before stopping the training .
         # EarlyStoppingPlugin(patience, 'train_stream')
+        # LoadBestPlugin('train_stream')
         plugin_list=[LRSchedulerPlugin(scheduler),LoadBestPlugin('train_stream')]
-        
+        text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         if strate=='CWRStar':
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = CWRStar(
                 model, optimizer,
                 CrossEntropyLoss(),cwr_layer_name=None, train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif 'Replay' in strate: 
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Replay(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,mem_size=buffer_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif (strate=='JointTraining' and current_mode=='offline'):
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = JointTraining(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch*args.timestamp//3, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif 'GDumbFinetune' in strate:
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list,mem_size=buffer_size,reset=False,buffer='class_balance')
         # stanard gdumb= reset model+ class_balance buffer'
         elif 'GDumb' in strate:
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
@@ -183,7 +179,6 @@ for strate in method_query:
                 resett=False
             alpha_mode ='Dynamic' if 'Dynamic' in strate else 'Fixed'
             alpha_value=float(strate.split("_")[-1])
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
@@ -191,7 +186,6 @@ for strate in method_query:
                 alpha_mode=alpha_mode,alpha_value=alpha_value)
         # this is basically the 'reservoir sampling in the paper(no reset+ reservoir sampling'
         elif 'Reservoir' in strate:
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GDumb(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
@@ -201,13 +195,11 @@ for strate in method_query:
                 resett=True
             else:
                 resett=False
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Cumulative(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list,reset=resett)
         elif strate=='LwF':
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = LwF(
                 model, optimizer,
                 CrossEntropyLoss(),
@@ -215,62 +207,52 @@ for strate in method_query:
                 train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif strate=='GEM':
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = GEM(
                 model, optimizer,
                 CrossEntropyLoss(), patterns_per_exp=data_count,memory_strength=0.5, train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif 'AGEMFixed' in strate:
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = AGEM(
                 model, optimizer,
                 CrossEntropyLoss(),patterns_per_exp=buffer_size,sample_size=buffer_size, train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list,reservoir=True)
         elif 'AGEM' in strate:
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = AGEM(
                 model, optimizer,
                 CrossEntropyLoss(),patterns_per_exp=buffer_size,sample_size=buffer_size, train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list,reservoir=False)
         elif strate=='EWC':
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = EWC(
                 model, optimizer,
                 CrossEntropyLoss(), ewc_lambda=0.4, mode='online',decay_factor=0.1,
                 train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif strate=='Naive':
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = Naive(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         # elif strate=='ICaRL':
-        #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         #     cl_strategy = ICaRL(
         #         model, optimizer,
         #         CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
         #         evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif strate=='SynapticIntelligence':
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = SynapticIntelligence(
                 model, optimizer,
                 CrossEntropyLoss(), si_lambda=0.0001,train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         elif 'CoPE' in strate:
-            text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
             cl_strategy = CoPE(
                 model, optimizer,
                 CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,mem_size=buffer_size,
                 evaluator=eval_plugin,device=device,plugins=plugin_list)
         # elif strate=='AR1':
-        #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         #     cl_strategy = AR1(
         #         model, optimizer,
         #         CrossEntropyLoss(), train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
         #         evaluator=eval_plugin,device=device,plugins=plugin_list)
         # elif strate=='StreamingLDA':
-        #     text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         #     cl_strategy = StreamingLDA(
         #         slda_model=model, 
         #         criterion=CrossEntropyLoss(), input_size= 224,num_classes=args.num_classes,train_mb_size=args.batch_size, train_epochs=args.nepoch, eval_mb_size=args.batch_size,
@@ -295,7 +277,7 @@ for strate in method_query:
         else:
             for experience in scenario.train_stream:
                 print("Start of experience: ", experience.current_experience)
-                print("Current Classes: ", experience.classes_in_this_experience)
+                # print("Current Classes: ", experience.classes_in_this_experience)
                 print('current strate is {} {}'.format(strate,current_mode))
                 # offline
                 if(current_mode=='offline'):

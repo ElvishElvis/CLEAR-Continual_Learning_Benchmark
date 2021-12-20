@@ -124,13 +124,14 @@ class EvaluationPlugin(StrategyPlugin):
         if not self._active:
             return []
         metric_values = []
+        # print(callback)
+        # print(self.metrics[0]._accuracy._mean_accuracy[0].summed)
         for metric in self.metrics:
             metric_result = getattr(metric, callback)(strategy)
             if isinstance(metric_result, Sequence):
                 metric_values += list(metric_result)
             elif metric_result is not None:
                 metric_values.append(metric_result)
-
         for metric_value in metric_values:
             name = metric_value.name
             x = metric_value.x_plot
@@ -138,9 +139,7 @@ class EvaluationPlugin(StrategyPlugin):
             if self.collect_all:
                 self.all_metric_results[name][0].append(x)
                 self.all_metric_results[name][1].append(val)
-
             self.last_metric_results[name] = val
-
         for logger in self.loggers:
             getattr(logger, callback)(strategy, metric_values)
         return metric_values

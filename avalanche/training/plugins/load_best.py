@@ -31,28 +31,39 @@ class LoadBestPlugin(StrategyPlugin):
         self.best_state = None  # Contains the best parameters
         self.best_val = None
         self.best_epoch = None
+        # self.reset=reset # reset the best in each experience training 
 
-    def before_training(self, strategy, **kwargs):
+    def before_training_exp(self, strategy, **kwargs):
         self.best_state = None
         self.best_val = None
         self.best_epoch = None
+        strategy.evaluator.reset_last_metrics()
 
-    def before_training_epoch(self, strategy, **kwargs):
+    def after_training_epoch(self, strategy, **kwargs):
         self._update_best(strategy)
 
     def before_eval(self,strategy,**kwargs):
-        strategy.model.load_state_dict(self.best_state)
-        print('###########################################################')
-        print('Loading best model from epoch {} with acc {}'.format(self.best_epoch,self.best_val))
-        print('###########################################################')
+        if(self.best_state==None):
+            print('Not using best model since it is None')
+        else:
+            strategy.model.load_state_dict(self.best_state)
+            print('###########################################################')
+            print('Loading best model from epoch {} with acc {}'.format(self.best_epoch,self.best_val))
+            print('###########################################################')
 
     def _update_best(self, strategy):
         res = strategy.evaluator.get_last_metrics()
         val_acc = res.get(self.metric_key)
+        # dict have thing like Top1_Acc_Epoch/train_phase/train_stream/Task000, but self.metric_key don't have the suffix of Task000
+        if(val_acc==None):
+            key_match=self.metric_key
+            key_list=list(res.keys())
+            for key in key_list:
+                if(self.metric_key in key):
+                    key_match=key
+                    break
+            val_acc=res.get(key_match)
         if self.best_val is None or self.operator(val_acc, self.best_val):
-            print('###########################################################')
-            print(self.best_val)
-            print()
             self.best_state = deepcopy(strategy.model.state_dict())
             self.best_val = val_acc
             self.best_epoch = strategy.clock.train_exp_epochs

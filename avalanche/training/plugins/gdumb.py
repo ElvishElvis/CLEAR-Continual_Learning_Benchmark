@@ -59,7 +59,8 @@ class GDumbPlugin(StrategyPlugin):
             strategy.model_adaptation(self.init_model)
     def before_eval_dataset_adaptation(self, strategy: 'BaseStrategy',
                                        **kwargs):
-        strategy.model_adaptation(self.init_model)
+        if self.reset==True:
+            strategy.model_adaptation(self.init_model)
     def after_train_dataset_adaptation(self, strategy: "BaseStrategy",
                                        **kwargs):
         self.storage_policy.update(strategy, **kwargs)

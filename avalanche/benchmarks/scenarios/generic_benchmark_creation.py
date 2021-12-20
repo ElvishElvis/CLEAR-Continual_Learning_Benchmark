@@ -91,7 +91,6 @@ def create_multi_dataset_generic_benchmark(
 
     :returns: A :class:`GenericCLScenario` instance.
     """
-
     transform_groups = dict(
         train=(train_transform, train_target_transform),
         eval=(eval_transform, eval_target_transform))

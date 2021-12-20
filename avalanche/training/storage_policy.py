@@ -123,48 +123,46 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
 
     def update(self, strategy: 'BaseStrategy', **kwargs):
         """ Update buffer. """
+        import numpy as np
+        # assert the order of data bucket is correct
+        bucket=strategy.experience.dataset._dataset._dataset.get_bucket()
+        assert strategy.experience.dataset._dataset._dataset.dataset.dataset.get_timestamp_index()[bucket]==\
+               strategy.experience.dataset._dataset._dataset.get_indice()
+        assert strategy.experience.current_experience==strategy.experience.task_labels[0]
+        assert strategy.experience.current_experience==bucket
         self.current_experience_id=strategy.experience.current_experience
         self.update_from_dataset(strategy.experience.dataset)
 
     def update_from_dataset(self, new_data: AvalancheDataset):
-        # import pdb;pdb.set_trace()
-        new_items_to_add_to_buffer=[]
-        # print(new_data._indices)
-        # import pdb;pdb.set_trace()
-        for index in new_data._indices:
-            if(len(self.buffer_index_list)<self.max_size):
-                self.buffer_index_list.append(index)
+        if(self.current_experience_id==0):
+            self.buffer=AvalancheConcatDataset([self.buffer,new_data])
+            self.resize(self.max_size)
+        else:
+            new_items_to_add_to_buffer=[]
+            new_weights = torch.rand(len(new_data))
+            new_weights_enum = [(i,new_weights[i]) for i in range(len(new_weights))]
+            space_in_buffer=self.max_size-len(self.buffer)
+            if(self.alpha_mode=='Fixed'):
+                # alpha*k/n= alpha*k/k*i=alpha/i
+                prob=self.alpha_value/(self.current_experience_id+1)
+                # print(prob,self.alpha_value,self.current_experience_id+1)
+            elif (self.alpha_mode=='Dynamic'):
+                prob=self.alpha_value
+            new_items_to_add_to_buffer = list(filter(lambda x: x[1] <= prob, new_weights_enum))
+            new_items_to_add_to_buffer = list(map(lambda x: x[0], new_items_to_add_to_buffer))
+            
+            new_data_to_add=AvalancheSubset(new_data,new_items_to_add_to_buffer)
+            if len(new_data_to_add)<=space_in_buffer:
+                self.buffer=AvalancheConcatDataset([self.buffer,new_data_to_add])
             else:
-                if(self.alpha_mode=='Fixed'):
-                    # alpha*k/n= alpha*k/k*i=alpha/i
-                    prob=self.alpha_value/(self.current_experience_id+1)
-                    # print(prob,self.alpha_value,self.current_experience_id+1)
-                elif (self.alpha_mode=='Dynamic'):
-                    prob=self.alpha_value
-                if random.random() <= prob:
-                    new_items_to_add_to_buffer.append(index)
-        # print('id'+str(self.current_experience_id+1))
-        # print(len(self.buffer_index_list))
-        # print(len(new_items_to_add_to_buffer))
-        random.shuffle(self.buffer_index_list)
-        self.buffer_index_list=self.buffer_index_list[:len(self.buffer_index_list) - len(new_items_to_add_to_buffer)]
-        self.buffer_index_list+=new_items_to_add_to_buffer
+                self.buffer = AvalancheSubset(self.buffer, torch.arange(len(self.buffer) - len(new_data_to_add)))
+                self.buffer = AvalancheConcatDataset([self.buffer,new_data_to_add])
         print('Using bias_reservoir_sampling')
         print("alpha_mode {} ".format(self.alpha_mode))
         print("alpha_value {} ".format(self.alpha_value))
-        assert len(self.buffer_index_list)==self.max_size
-        self.history_data=AvalancheConcatDataset([self.history_data,new_data])
-        self.buffer = AvalancheSubset(self.history_data, self.buffer_index_list)
-        # for index in range(self.max_size):
-        # new_weights = torch.rand(len(new_data))**(1/weight)
-        # cat_weights = torch.cat([new_weights, self._buffer_weights])
-        
-        # sorted_weights, sorted_idxs = cat_weights.sort(descending=True)
-        # buffer_idxs = sorted_idxs[:self.max_size]
-        
-        # self._buffer_weights = sorted_weights[:self.max_size]
+        assert len(self.buffer)==self.max_size
 
-    def resize(self, strategy, new_size):
+    def resize(self, new_size):
         """ Update the maximum size of the buffer. """
         self.max_size = new_size
         if len(self.buffer) <= self.max_size:

@@ -1,10 +1,8 @@
 import torch
 from torch.utils.data import random_split
 
-from avalanche.benchmarks.utils.data_loader import \
 import math
 from torch.utils.data import random_split, DataLoader
-
 from avalanche.benchmarks.utils import AvalancheConcatDataset,AvalancheDataset, AvalancheSubset
 from avalanche.benchmarks.utils.data_loader import GroupBalancedDataLoader, \
     GroupBalancedInfiniteDataLoader

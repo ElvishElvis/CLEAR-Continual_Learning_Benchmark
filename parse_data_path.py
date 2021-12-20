@@ -40,6 +40,10 @@ def list_all_files(args,rootdir):
             train_list.extend(train_subset)
             test_list.extend(test_subset)
             all_list.extend(image_list)
+    import random
+    random.shuffle(train_list)
+    random.shuffle(test_list)
+    random.shuffle(all_list)
     return train_list,test_list,all_list
 
 def parse_data_path(args):

@@ -10,8 +10,9 @@ import torch
 from avalanche.benchmarks  import benchmark_with_validation_stream
 from parse_data_path import *
 '''
-timestamp_index stand for, for each timestamp, the index of instance in the big data folder, since each subset represent
+timestamp_index stand for, for each timestamp, the index of instance in the txt file, since each subset represent
 one timestamp data, thus we need to have the index of data of each timestamp
+timestamp_index[0] == the set of index of data belong to bucket 1
 '''
 def get_instance_time(args,idx,all_timestamp_index):
     for index,list in enumerate(all_timestamp_index):
@@ -56,17 +57,18 @@ class CLEARDataset(Dataset):
             with open(data_txt_path,'r') as file:
                 title=file.readline()
                 while (True):
-                    try:
-                        line=file.readline()
-                        line_list=line.split()
-                        targets.append(int(line_list[1]))
-                        timestamp_index[int(line_list[2])-1].append(index)
-                        samples.append(line_list)
-                        index=index+1
-                        if(index%10000==0):
-                            print('finished processing data {}'.format(index))
-                    except:
+                    line=file.readline()
+                    if(line==''):
                         break
+                    #'/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images/bucket_6/racing/6111026970.jpg 8 6\n'
+                    line_list=line.split()
+                    targets.append(int(line_list[1]))
+                    timestamp_index[int(line_list[2])-1].append(index)
+                    samples.append(line_list)
+                    index=index+1
+                    if(index%10000==0):
+                        print('finished processing data {}'.format(index))
+                    
             self.targets=targets
             self.samples=samples
             self.timestamp_index=timestamp_index
@@ -112,17 +114,20 @@ class CLEARDataset(Dataset):
         # np.save('./buffered_data/{}/{}'.format(self.stage,str(index)),result)
         return sample,label
 class CLEARSubset(Dataset):
-    def __init__(self, dataset, indices, labels):
+    def __init__(self, dataset, indices, targets,bucket):
         self.dataset = torch.utils.data.Subset(dataset, indices)
-        self.targets = labels
         self.indices=indices
+        self.targets = targets
+        self.bucket=bucket
     def get_indice(self):
         return self.indices
+    def get_bucket(self):
+        return self.bucket
     def __getitem__(self, idx):
         image = self.dataset[idx][0]
-        target = self.targets[idx]
+        target = self.targets[idx].item()
+        assert int(self.dataset[idx][1])==target
         return (image, target)
-
     def __len__(self):
         return len(self.targets)
 def get_transforms(args):
@@ -161,19 +166,24 @@ def get_data_set_offline(args):
 
     list_train_dataset = []
     list_test_dataset = []
-
-
-    # for every incremental experience
-    split_num_train=len(train_Dataset)//n_experiences
-    split_num_test=len(test_Dataset)//n_experiences
     for i in range(n_experiences):
         # choose a random permutation of the pixels in the image
-        train_sub = CLEARSubset(train_Dataset,train_timestamp_index[i],train_Dataset.targets[i*split_num_train:(i+1)*split_num_train])
-        # # train_set=AvalancheDataset(train_sub)
-        test_sub = CLEARSubset(test_Dataset,test_timestamp_index[i],test_Dataset.targets[i*split_num_test:(i+1)*split_num_test])
-        # # test_set=AvalancheDataset(test_sub)
-        list_train_dataset.append(train_sub)
-        list_test_dataset.append(test_sub)
+        bucket_index=train_timestamp_index[i]
+        train_sub = CLEARSubset(train_Dataset,bucket_index,train_Dataset.targets[bucket_index],i)
+        train_set=AvalancheDataset(train_sub,task_labels=i)
+
+        bucket_index=test_timestamp_index[i]
+        test_sub = CLEARSubset(test_Dataset,bucket_index,test_Dataset.targets[bucket_index],i)
+        test_set=AvalancheDataset(test_sub,task_labels=i)
+        list_train_dataset.append(train_set)
+        list_test_dataset.append(test_set)
+    return dataset_benchmark(
+        list_train_dataset, 
+        list_test_dataset, 
+        train_transform=train_transform,
+        eval_transform=test_transform)
+    
+    
     # return ni_benchmark(
     #     list_train_dataset, 
     #     list_test_dataset, 
@@ -194,17 +204,17 @@ def get_data_set_offline(args):
     #     eval_transform=test_transform,
     #     seed=args.random_seed)
 
-    return nc_benchmark(
-        list_train_dataset,
-        list_test_dataset,
-        n_experiences=len(list_train_dataset),
-        task_labels=True,
-        shuffle=False,
-        class_ids_from_zero_in_each_exp=True,
-        one_dataset_per_exp=True,
-        train_transform=train_transform,
-        eval_transform=test_transform,
-        seed=args.random_seed)
+    # return nc_benchmark(
+    #     list_train_dataset,
+    #     list_test_dataset,
+    #     n_experiences=len(list_train_dataset),
+    #     task_labels=True,
+    #     shuffle=False,
+    #     class_ids_from_zero_in_each_exp=True,
+    #     one_dataset_per_exp=True,
+    #     train_transform=train_transform,
+    #     eval_transform=test_transform,
+    #     seed=args.random_seed)
     # valid_benchmark = benchmark_with_validation_stream(
     #         initial_benchmark_instance, 20, shuffle=False)
     # return valid_benchmark
@@ -219,14 +229,17 @@ def get_data_set_online(args):
 
     list_all_dataset = []
 
-
-    # for every incremental experience
-    split_num_all=len(all_Dataset)//n_experiences
     for i in range(n_experiences):
         # choose a random permutation of the pixels in the image
-        all_sub = CLEARSubset(all_Dataset,all_timestamp_index[i],all_Dataset.targets[i*split_num_all:(i+1)*split_num_all])
-        list_all_dataset.append(all_sub)
-
+        bucket_index=all_timestamp_index[i]
+        all_sub = CLEARSubset(all_Dataset,bucket_index,all_Dataset.targets[bucket_index],i)
+        all_set=AvalancheDataset(all_sub,task_labels=i)
+        list_all_dataset.append(all_set)
+    return dataset_benchmark(
+        list_train_dataset, 
+        list_test_dataset, 
+        train_transform=train_transform,
+        eval_transform=test_transform)
 
     # return ni_benchmark(
     #     list_all_dataset, 
@@ -251,17 +264,17 @@ def get_data_set_online(args):
     #     eval_transform=test_transform,
     #     seed=args.random_seed)
 
-    return nc_benchmark(
-        list_all_dataset,
-        list_all_dataset,
-        n_experiences=len(list_all_dataset),
-        task_labels=True,
-        shuffle=False,
-        class_ids_from_zero_in_each_exp=True,
-        one_dataset_per_exp=True,
-        train_transform=train_transform,
-        eval_transform=test_transform,
-        seed=args.random_seed)
+    # return nc_benchmark(
+    #     list_all_dataset,
+    #     list_all_dataset,
+    #     n_experiences=len(list_all_dataset),
+    #     task_labels=True,
+    #     shuffle=False,
+    #     class_ids_from_zero_in_each_exp=True,
+    #     one_dataset_per_exp=True,
+    #     train_transform=train_transform,
+    #     eval_transform=test_transform,
+    #     seed=args.random_seed)
     
 if __name__ == '__main__':
     dataset=get_data_set_online()
