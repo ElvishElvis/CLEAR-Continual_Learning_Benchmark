@@ -46,34 +46,34 @@ class CLEARDataset(Dataset):
     def get_timestamp_index(self):
         return self.timestamp_index
     def prepare_data(self,data_txt_path):
-        save_path='../{}/data_cache/{}_save'.format(self.args.split,self.stage)
-        if(os.path.isfile(save_path+'.npy')):
-            self.targets,self.samples,self.timestamp_index=np.load(save_path+'.npy',allow_pickle=True)
-        else:
-            samples=[]
-            targets=[]
-            timestamp_index=[[] for i in range(self.n_experiences)]
-            index=0
-            with open(data_txt_path,'r') as file:
-                title=file.readline()
-                while (True):
-                    line=file.readline()
-                    if(line==''):
-                        break
-                    #'/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images/bucket_6/racing/6111026970.jpg 8 6\n'
-                    line_list=line.split()
-                    targets.append(int(line_list[1]))
-                    timestamp_index[int(line_list[2])-1].append(index)
-                    samples.append(line_list)
-                    index=index+1
-                    if(index%10000==0):
-                        print('finished processing data {}'.format(index))
-                    
-            self.targets=targets
-            self.samples=samples
-            self.timestamp_index=timestamp_index
-            save=(self.targets,self.samples,self.timestamp_index)
-            np.save(save_path,save)
+        # save_path='../{}/data_cache/{}_save'.format(self.args.split,self.stage)
+        # if(os.path.isfile(save_path+'.npy')):
+        #     self.targets,self.samples,self.timestamp_index=np.load(save_path+'.npy',allow_pickle=True)
+        # else:
+        samples=[]
+        targets=[]
+        timestamp_index=[[] for i in range(self.n_experiences)]
+        index=0
+        with open(data_txt_path,'r') as file:
+            title=file.readline()
+            while (True):
+                line=file.readline()
+                if(line==''):
+                    break
+                #'/data3/zhiqiul/yfcc_dynamic_10/dynamic_300/images/bucket_6/racing/6111026970.jpg 8 6\n'
+                line_list=line.split()
+                targets.append(int(line_list[1]))
+                timestamp_index[int(line_list[2])-1].append(index)
+                samples.append(line_list)
+                index=index+1
+                if(index%10000==0):
+                    print('finished processing data {}'.format(index))
+                
+        self.targets=targets
+        self.samples=samples
+        self.timestamp_index=timestamp_index
+            # save=(self.targets,self.samples,self.timestamp_index)
+            # np.save(save_path,save)
 
     def __len__(self):
         return len(self.samples)
@@ -117,7 +117,7 @@ class CLEARSubset(Dataset):
     def __init__(self, dataset, indices, targets,bucket):
         self.dataset = torch.utils.data.Subset(dataset, indices)
         self.indices=indices
-        self.targets = targets
+        self.targets = targets.numpy() # need to be in numpy(thus set of targets have only 10 elem,rather than many with tensor)
         self.bucket=bucket
     def get_indice(self):
         return self.indices
@@ -125,7 +125,7 @@ class CLEARSubset(Dataset):
         return self.bucket
     def __getitem__(self, idx):
         image = self.dataset[idx][0]
-        target = self.targets[idx].item()
+        target = self.targets[idx]
         assert int(self.dataset[idx][1])==target
         return (image, target)
     def __len__(self):
@@ -175,6 +175,7 @@ def get_data_set_offline(args):
         bucket_index=test_timestamp_index[i]
         test_sub = CLEARSubset(test_Dataset,bucket_index,test_Dataset.targets[bucket_index],i)
         test_set=AvalancheDataset(test_sub,task_labels=i)
+
         list_train_dataset.append(train_set)
         list_test_dataset.append(test_set)
     return dataset_benchmark(
@@ -205,16 +206,16 @@ def get_data_set_offline(args):
     #     seed=args.random_seed)
 
     # return nc_benchmark(
-    #     list_train_dataset,
-    #     list_test_dataset,
-    #     n_experiences=len(list_train_dataset),
-    #     task_labels=True,
-    #     shuffle=False,
-    #     class_ids_from_zero_in_each_exp=True,
-    #     one_dataset_per_exp=True,
-    #     train_transform=train_transform,
-    #     eval_transform=test_transform,
-    #     seed=args.random_seed)
+        # list_train_dataset,
+        # list_test_dataset,
+        # n_experiences=len(list_train_dataset),
+        # task_labels=True,
+        # shuffle=False,
+        # class_ids_from_zero_in_each_exp=True,
+        # one_dataset_per_exp=True,
+        # train_transform=train_transform,
+        # eval_transform=test_transform,
+        # seed=args.random_seed)
     # valid_benchmark = benchmark_with_validation_stream(
     #         initial_benchmark_instance, 20, shuffle=False)
     # return valid_benchmark
@@ -236,10 +237,11 @@ def get_data_set_online(args):
         all_set=AvalancheDataset(all_sub,task_labels=i)
         list_all_dataset.append(all_set)
     return dataset_benchmark(
-        list_train_dataset, 
-        list_test_dataset, 
+        list_all_dataset, 
+        list_all_dataset, 
         train_transform=train_transform,
         eval_transform=test_transform)
+
 
     # return ni_benchmark(
     #     list_all_dataset, 

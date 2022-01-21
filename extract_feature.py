@@ -9,7 +9,7 @@ import torch
 from parse_data_path import *
 from load_dataset import *
 from get_config import *
-
+import matplotlib.pyplot as plt 
 import torch
 
 MOCO_PATH = "/data3/zhiqiul/self_supervised_models/moco_r50_v2-e3b0c442.pth"
@@ -115,9 +115,11 @@ def extract_feature(args):
         image=image.cuda()
         class_=class_.cuda()
         timestamp=get_instance_time(args,index,all_timestamp_index)
-        output=model(image).detach().cpu() #torch.Size([1, 2048])
-        target_path=os.path.join(feature_path,"bucket_"+str(timestamp+1),class_list[class_.detach().cpu().item()])
-        torch.save(output,os.path.join(target_path,'{}.pth'.format(index)))
+        output=model(image).clone().detach().cpu() #torch.Size([1, 2048])
+        target_path=os.path.join(feature_path,"bucket_"+str(timestamp+1),class_list[class_.clone().detach().cpu().item()])
+        prefix=dataset.samples[index][0].split('/')[-1].split('.')[0]
+        torch.save(output,os.path.join(target_path,'{}.pth'.format(prefix)))
+        # plt.imsave(os.path.join(target_path,'{}.png'.format(prefix)),image.detach().cpu().numpy()[0].transpose(1,2,0).astype('uint8'))
     return args
 
 

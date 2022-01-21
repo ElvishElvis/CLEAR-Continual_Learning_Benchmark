@@ -73,7 +73,7 @@ if(restart==1):
 os.makedirs("../{}".format(args.split),exist_ok=True)
 os.makedirs("../{}/log/".format(args.split),exist_ok=True)
 os.makedirs("../{}/model/".format(args.split),exist_ok=True)
-method_query=args.method.split()
+method_query=args.method.split() # list of CL method to run
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # torch.cuda.get_device_name(0)
@@ -86,26 +86,27 @@ if(args.pretrain_feature!='None'):
     args.split='temp_folder' # dummy folder for extracting feature
     args=extract_feature(args)
     print('Finished extract feature {}'.format(args.pretrain_feature))
-    args.split=args.temp_split
     os.system('rm -rf ../temp_folder')
+    args.split=args.temp_split
     args.data_folder_path=os.path.join(args.feature_path,args.pretrain_feature)
-
 '''
 Move data from /data to /scratch (for trinity server)
+It only move the data in args.data_folder_path, not the current script
 '''
 target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
 print('Moving data to local server')
-if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
+# if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
+if(True):
     os.system('rm -rf {}'.format(target_path))
     os.makedirs(target_path,exist_ok=True)
     os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
 args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
 
-
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
 # ['GDumb','Naive','JointTraining','Cumulative']
 with open('../{}/args.txt'.format(args.split), 'w') as f:
-    print('args', args, file=f) # direct args to file
+    print('args', args, file=f) # keep a copy of the args
+os.system('cp -rf ../avalanche ../{}/'.format(args.split)) # keep a copy of the scripts
 for strate in method_query:
     for current_mode in ['offline']:
         # skip previous train model if necessary
@@ -143,7 +144,7 @@ for strate in method_query:
         scheduler= make_scheduler(optimizer,args.step_schedular_decay,args.schedular_step)
         # patience=5 # Number of epochs to wait without generalization improvements before stopping the training .
         # EarlyStoppingPlugin(patience, 'train_stream')
-        # LoadBestPlugin('train_stream')
+        # 
         plugin_list=[LRSchedulerPlugin(scheduler),LoadBestPlugin('train_stream')]
         text_logger ,interactive_logger,eval_plugin=build_logger("{}_{}".format(strate,current_mode))
         if strate=='CWRStar':
@@ -277,7 +278,7 @@ for strate in method_query:
         else:
             for experience in scenario.train_stream:
                 print("Start of experience: ", experience.current_experience)
-                # print("Current Classes: ", experience.classes_in_this_experience)
+                print("Current Classes: ", experience.classes_in_this_experience)
                 print('current strate is {} {}'.format(strate,current_mode))
                 # offline
                 if(current_mode=='offline'):
@@ -301,7 +302,7 @@ for strate in method_query:
                 torch.save(model.state_dict(), model_save_path)
                 log_path='../{}/log/'.format(args.split)
                 log_name='log_{}.txt'.format("{}_{}".format(strate,current_mode))
-                move_metric_to_main_node(log_path,log_name,main_server_path='/data/jiashi/metric')
+                # move_metric_to_main_node(log_path,log_name,main_server_path='/data/jiashi/metric')
 
 
                 

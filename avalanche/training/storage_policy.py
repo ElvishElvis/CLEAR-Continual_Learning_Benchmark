@@ -125,11 +125,11 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         """ Update buffer. """
         import numpy as np
         # assert the order of data bucket is correct
-        bucket=strategy.experience.dataset._dataset._dataset.get_bucket()
-        assert strategy.experience.dataset._dataset._dataset.dataset.dataset.get_timestamp_index()[bucket]==\
-               strategy.experience.dataset._dataset._dataset.get_indice()
-        assert strategy.experience.current_experience==strategy.experience.task_labels[0]
-        assert strategy.experience.current_experience==bucket
+        # bucket=strategy.experience.dataset._dataset._dataset.get_bucket()
+        # assert strategy.experience.dataset._dataset._dataset.dataset.dataset.get_timestamp_index()[bucket]==\
+        #        strategy.experience.dataset._dataset._dataset.get_indice()
+        # assert strategy.experience.current_experience==strategy.experience.task_labels[0]
+        # assert strategy.experience.current_experience==bucket
         self.current_experience_id=strategy.experience.current_experience
         self.update_from_dataset(strategy.experience.dataset)
 

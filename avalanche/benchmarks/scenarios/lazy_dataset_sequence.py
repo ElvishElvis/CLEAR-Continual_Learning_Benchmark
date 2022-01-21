@@ -200,7 +200,6 @@ class LazyDatasetSequence(Sequence[AvalancheDataset]):
                 raise ValueError(
                     'All experience datasets must be subclasses of'
                     ' AvalancheDataset')
-
             self._loaded_experiences[exp_id] = generated_exp
             self.targets_field_sequence[exp_id] = generated_exp.targets
             self.task_labels_field_sequence[exp_id] = \

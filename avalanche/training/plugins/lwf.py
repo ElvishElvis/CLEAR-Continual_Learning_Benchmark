@@ -75,6 +75,8 @@ class LwFPlugin(StrategyPlugin):
                     yc = y_curr[task_id]
                     au = self.prev_classes[task_id]
                     dist_loss += self._distillation_loss(yc, yp, au)
+                # print('self.prev_classes')
+                # print(self.prev_classes)
             return alpha * dist_loss
 
     def before_backward(self, strategy, **kwargs):
@@ -94,6 +96,10 @@ class LwFPlugin(StrategyPlugin):
         """
         self.prev_model = copy.deepcopy(strategy.model)
         task_ids = strategy.experience.dataset.task_set
+        # print('task_ids')
+        # print(task_ids)
+        # print('self.prev_classes')
+        # print(self.prev_classes)
         for task_id in task_ids:
             task_data = strategy.experience.dataset.task_set[task_id]
             pc = set(task_data.targets)

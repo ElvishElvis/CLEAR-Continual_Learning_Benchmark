@@ -801,7 +801,6 @@ class GenericExperience(AbstractExperience[TGenericCLScenario,
         self.dataset: AvalancheDataset = \
             origin_stream.benchmark.stream_definitions[
                 origin_stream.name].exps_data[current_experience]
-
         (classes_in_this_exp, previous_classes, classes_seen_so_far,
          future_classes) = origin_stream.benchmark.get_classes_timeline(
             current_experience, stream=origin_stream.name)
