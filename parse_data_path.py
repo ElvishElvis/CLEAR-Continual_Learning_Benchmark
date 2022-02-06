@@ -20,9 +20,9 @@ from sklearn.model_selection import train_test_split
 def list_all_files(args,rootdir):
     train_list,test_list,all_list = [],[],[]
     bucket_list = os.listdir(rootdir)
-    bucket_list=list(filter(lambda a: 'bucket_' in a,bucket_list))
-    if('bucket_0' in bucket_list):
-        bucket_list.remove('bucket_0') # skip bucket 0, since it's for pretrain feature
+    # bucket_list=list(filter(lambda a: 'bucket_' in a,bucket_list))
+    if('0' in bucket_list):
+        bucket_list.remove('0') # skip bucket 0, since it's for pretrain feature
     classes_list=  os.listdir(osp.join(rootdir,bucket_list[0]))
     if('clear25d' in args.split and 'BACKGROUND' in classes_list):
         classes_list.remove('BACKGROUND') # skip bucket 0, since it's for pretrain feature
@@ -71,7 +71,8 @@ def parse_data_path(args):
                 if classes not in class_list:
                     continue
                 class_index=class_list.index(classes)
-                timestamp=name_list[-3].split('_')[-1] # since name is bucket_x
+                timestamp=name_list[-3]
+                # timestamp=name_list[-3].split('_')[-1] # since name is bucket_x
                 file.write("\n")
                 file.write(item+ " "+str(class_index)+" "+str(timestamp))
         print('{} parse path finish!'.format(stage))

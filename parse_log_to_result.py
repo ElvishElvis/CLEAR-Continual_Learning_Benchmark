@@ -55,6 +55,7 @@ if __name__=="__main__":
     argparser.add_argument("--timestamp",type=int,default=10)
     argparser.add_argument("--verbose",type=int,default=0)
     argparser.add_argument("--move",type=int,default=0)
+    argparser.add_argument("--train_eval",type=int,default=0) # whether the code also include the evaluation of training set as well 
 
     args = argparser.parse_args()
 
@@ -62,6 +63,8 @@ if __name__=="__main__":
     log_list=sorted(os.listdir(logpath))
 
     for name in log_list:
+        if(name.split('.')[-1]!='txt'):
+            continue
         result_list=[]
         log_file_name=os.path.join(logpath,name)
         file=open(log_file_name, 'r')
@@ -70,13 +73,23 @@ if __name__=="__main__":
                 line=file.readline()
             except:
                 break
-            if('Top1_Acc_Stream/eval_phase/test_stream/Task00' in line):
+            if('Top1_Acc_Stream/eval_phase/test_stream/Task0' in line):
                 result_list.append(float(line.split()[-1]))
             if not line:
                 break
         file.close()
         if(args.move==1):
             move_metric_to_main_node(logpath,name)
+        if(args.train_eval==1):
+            try:
+                lowerIndex=[i for i in range(10,200,20)]
+                upperIndex=[i for i in range(21,210,20)]
+                eval_index=[k for i in range(len(lowerIndex)) for k in range(lowerIndex[i],upperIndex[i]-1) ]
+                result_list=np.array(result_list)[eval_index]
+            except:
+                print('#################################################')
+                print('Skipping {} for removing train result'.format(name))
+                print('#################################################')
         if(len(result_list)!=int(args.timestamp*args.timestamp)):
             if('online' in name):
                 # assert np.max(result_list[:args.timestamp])<0.3
@@ -84,13 +97,14 @@ if __name__=="__main__":
             print("{} count of {}, with mean of {}".format(name,len(result_list), np.mean(result_list)))
         else:
             result_list=np.array(result_list)
-            if(args.verbose==1):
-                print(result_list)
             if('online' in name):
+                continue
                 # assert np.max(result_list[:args.timestamp])<0.3
                 index_list=get_online_protocol_index(class_=args.timestamp)
             else:
                 index_list=get_offline_protocol_index(class_=args.timestamp)
+            if(args.verbose==1):
+                print(result_list)
             result_list=[str(np.mean(result_list[np.array(item[1])])) for item in index_list.items()]
             key_list=[item[0] for item in index_list.items()]
             print("{} with {} of {}".format(name,", ".join(key_list),", ".join(result_list)))

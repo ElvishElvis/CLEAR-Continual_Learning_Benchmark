@@ -134,6 +134,12 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
         self.update_from_dataset(strategy.experience.dataset)
 
     def update_from_dataset(self, new_data: AvalancheDataset):
+        # if size of incoming data is greater than the memory, we first extract size=(memory size) from the incoming data
+        # and then sample from the incoming data with alpha bias sampling
+        if(len(new_data)>self.max_size):
+            import numpy as np
+            sample_index=np.random.choice(len(new_data), self.max_size, replace=False).tolist()
+            new_data=AvalancheSubset(new_data,sample_index)
         if(self.current_experience_id==0):
             self.buffer=AvalancheConcatDataset([self.buffer,new_data])
             self.resize(self.max_size)
@@ -150,7 +156,6 @@ class BiasedReservoirSamplingBuffer(ExemplarsBuffer):
                 prob=self.alpha_value
             new_items_to_add_to_buffer = list(filter(lambda x: x[1] <= prob, new_weights_enum))
             new_items_to_add_to_buffer = list(map(lambda x: x[0], new_items_to_add_to_buffer))
-            
             new_data_to_add=AvalancheSubset(new_data,new_items_to_add_to_buffer)
             if len(new_data_to_add)<=space_in_buffer:
                 self.buffer=AvalancheConcatDataset([self.buffer,new_data_to_add])

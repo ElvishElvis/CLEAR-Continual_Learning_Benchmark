@@ -80,7 +80,7 @@ def extract_feature(args):
     loader=DataLoader(dataset,batch_size=1,shuffle=False,collate_fn=collator)
     os.makedirs(args.feature_path,exist_ok=True)
     feature=args.pretrain_feature
-    pre_dataset,pre_net,target_dataset,target_num= args.pretrain_feature.split('_')[:-1] # name like moco_resnet18_clear_10_feature
+    pre_dataset,pre_net,_,_= args.pretrain_feature.split('_')[:-1] # name like moco_resnet18_clear_10_feature
     feature_path=os.path.join(args.feature_path,'{}'.format(feature))
     class_list=args.class_list.split()
     if(os.path.isdir(feature_path)):
@@ -89,9 +89,9 @@ def extract_feature(args):
     # create feature folder
     os.makedirs(feature_path,exist_ok=True)
     for ii in range(1,args.timestamp+1):
-        os.makedirs(os.path.join(feature_path,"bucket_"+str(ii)),exist_ok=True)
+        os.makedirs(os.path.join(feature_path,str(ii)),exist_ok=True)
         for item in class_list:
-            os.makedirs(os.path.join(feature_path,"bucket_"+str(ii),item),exist_ok=True)
+            os.makedirs(os.path.join(feature_path,str(ii),item),exist_ok=True)
 
     os.makedirs(feature_path,exist_ok=True)
     if(pre_dataset=='moco' and pre_net=='resnet18'):
@@ -116,7 +116,7 @@ def extract_feature(args):
         class_=class_.cuda()
         timestamp=get_instance_time(args,index,all_timestamp_index)
         output=model(image).clone().detach().cpu() #torch.Size([1, 2048])
-        target_path=os.path.join(feature_path,"bucket_"+str(timestamp+1),class_list[class_.clone().detach().cpu().item()])
+        target_path=os.path.join(feature_path,str(timestamp+1),class_list[class_.clone().detach().cpu().item()])
         prefix=dataset.samples[index][0].split('/')[-1].split('.')[0]
         torch.save(output,os.path.join(target_path,'{}.pth'.format(prefix)))
         # plt.imsave(os.path.join(target_path,'{}.png'.format(prefix)),image.detach().cpu().numpy()[0].transpose(1,2,0).astype('uint8'))

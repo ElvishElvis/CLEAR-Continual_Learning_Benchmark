@@ -48,6 +48,7 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument("--timestamp",type=int,default=10)
 argparser.add_argument("--plot",type=int,default=0) # 1 for generating plot
 argparser.add_argument("--verbose",type=int,default=0) # 1 for print out detailed metric
+argparser.add_argument("--train_eval",type=int,default=0) # whether the code also include the evaluation of training set as well 
 args = argparser.parse_args()
 
 
@@ -70,11 +71,21 @@ for name in unique_name:
                 line=file.readline()
             except:
                 break
-            if('Top1_Acc_Stream/eval_phase/test_stream/Task00' in line):
+            if('Top1_Acc_Stream/eval_phase/test_stream/Task0' in line):
                 result_list.append(float(line.split()[-1]))
             if not line:
                 break
         file.close()
+        if(args.train_eval==1):
+            try:
+                lowerIndex=[i for i in range(10,200,20)]
+                upperIndex=[i for i in range(21,210,20)]
+                eval_index=[k for i in range(len(lowerIndex)) for k in range(lowerIndex[i],upperIndex[i]-1) ]
+                result_list=np.array(result_list)[eval_index]
+            except:
+                print('#################################################')
+                print('Skipping {} for removing train result'.format(name))
+                print('#################################################')
         if(len(result_list)!=int(args.timestamp*args.timestamp)):
             if('online' in name):
                 # assert np.max(result_list[:args.timestamp])<0.3

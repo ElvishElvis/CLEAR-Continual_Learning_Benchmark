@@ -95,12 +95,13 @@ It only move the data in args.data_folder_path, not the current script
 '''
 target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
 print('Moving data to local server')
-# if(os.path.isdir(os.path.join(target_path,args.data_folder_path.split('/')[-1]))==False):
-if(True):
+# '/scratch/jiashi/data/jiashi/moco_resnet50_clear_10_feature'
+path_on_scratch=os.path.join(target_path,args.data_folder_path.split('/')[-1])
+if(os.path.isdir(path_on_scratch)==False):
     os.system('rm -rf {}'.format(target_path))
     os.makedirs(target_path,exist_ok=True)
     os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
-args.data_folder_path=os.path.join(target_path,args.data_folder_path.split('/')[-1])
+args.data_folder_path=path_on_scratch
 
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
 # ['GDumb','Naive','JointTraining','Cumulative']
@@ -129,6 +130,7 @@ for strate in method_query:
             model=nn.Linear(2048,args.num_classes)
         data_count=int(args.num_classes*args.num_instance_each_class) if current_mode=='online' else int(args.num_classes*args.num_instance_each_class*(1-args.test_split))
         print('data_count is {}'.format(data_count))
+        data_count=min(args.max_memory_size,data_count) # buffer_size cannot be greater than 3000
         if(strate.split("_")[-1].isnumeric()==False):
             buffer_size=data_count
         else:

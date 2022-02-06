@@ -20,4 +20,5 @@ def get_config():
     argparser.add_argument("--random_seed",type=int,default=1111)
     argparser.add_argument("--test_split",type=float,default=0.3)
     argparser.add_argument("--pretrain_feature",type=str,default='None')
+    argparser.add_argument("--max_memory_size",type=int,default=3000)
     return argparser
