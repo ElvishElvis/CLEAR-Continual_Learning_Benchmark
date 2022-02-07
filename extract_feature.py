@@ -80,7 +80,12 @@ def extract_feature(args):
     loader=DataLoader(dataset,batch_size=1,shuffle=False,collate_fn=collator)
     os.makedirs(args.feature_path,exist_ok=True)
     feature=args.pretrain_feature
-    pre_dataset,pre_net,_,_= args.pretrain_feature.split('_')[:-1] # name like moco_resnet18_clear_10_feature
+    split_compo=args.pretrain_feature.split('_')[:-1] # name like moco_resnet18_clear_10_feature
+    if(len(split_compo)==4):
+        pre_dataset,pre_net,_,_=split_compo
+        # train_test_prefix=""
+    elif(len(split_compo)==5):
+        train_test_prefix,pre_dataset,pre_net,_,_=split_compo
     feature_path=os.path.join(args.feature_path,'{}'.format(feature))
     class_list=args.class_list.split()
     if(os.path.isdir(feature_path)):

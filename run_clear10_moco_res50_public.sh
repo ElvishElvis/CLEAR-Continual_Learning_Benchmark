@@ -1,5 +1,7 @@
-CUDA_VISIBLE_DEVICES=0 python3 ../train.py \
+CUDA_VISIBLE_DEVICES=0 python3 train.py \
 --data_folder_path '/data3/zhiqiul/CLEAR-10-PUBLIC/labeled_images' \
+--data_train_path '/data3/zhiqiul/CLEAR-10-PUBLIC/labeled_images' \
+--data_test_path '/data3/zhiqiul/clear_datasets/CLEAR10-TEST-CLEANED/labeled_images' \
 --class_list 'BACKGROUND baseball bus camera cosplay dress hockey laptop racing soccer sweater' \
 --method 'LwF GDumb BiasReservoir_Fixed_reset_0.2 BiasReservoir_Fixed_reset_0.5 BiasReservoir_Fixed_reset_1.0 
 BiasReservoir_Fixed_reset_2.0 BiasReservoir_Fixed_reset_5.0 
@@ -8,7 +10,7 @@ BiasReservoir_Dynamic_reset_0.25 BiasReservoir_Dynamic_0.5
 BiasReservoir_Dynamic_0.25 BiasReservoir_Fixed_0.2 BiasReservoir_Fixed_0.5 BiasReservoir_Fixed_1.0 
 BiasReservoir_Fixed_2.0 BiasReservoir_Fixed_5.0 
 Cumulative CWRStar JointTraining EWC SynapticIntelligence Replay AGEMFixed Reservoir'  \
---split  'clear10_moco_res50_public' \
+--split  'clear10_moco_res50_public_private' \
 --restart '0' \
 --nepoch 100 \
 --step_schedular_decay 60 \
@@ -20,8 +22,9 @@ Cumulative CWRStar JointTraining EWC SynapticIntelligence Replay AGEMFixed Reser
 --timestamp  10 \
 --num_classes  11 \
 --num_instance_each_class 300 \
+--num_instance_each_class_test 150 \
 --random_seed 1111 \
 --test_split 0.3 \
 --feature_path '/data/jiashi/' \
---pretrain_feature 'moco_resnet50_clear_10_feature' 
+--pretrain_feature 'moco_resnet50_clear_10_feature' \
 --max_memory_size 3000

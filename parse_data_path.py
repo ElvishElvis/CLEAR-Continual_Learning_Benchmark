@@ -50,10 +50,20 @@ def list_all_files(args,rootdir):
 def parse_data_path(args):
 
     class_list=args.class_list.split()
+    # if available, use pre-split train/test, else, auto split the data_folder_path
+    if(args.data_test_path !='' and args.data_train_path!=''):
+        _, _,train_list= list_all_files(args,args.data_train_path)
 
-    data_dir = args.data_folder_path
-    print('parse data from {}'.format(data_dir))
-    train_list, test_list,all_list= list_all_files(args,data_dir)
+        train_datasize=args.num_instance_each_class
+        args.num_instance_each_class=args.num_instance_each_class_test
+
+        _, _,test_list= list_all_files(args,args.data_test_path)
+        all_list=train_list+test_list
+        args.num_instance_each_class=train_datasize
+    else:
+        data_dir = args.data_folder_path
+        print('parse data from {}'.format(data_dir))
+        train_list, test_list,all_list= list_all_files(args,data_dir)
     os.makedirs("../{}/data_cache/".format(args.split),exist_ok=True)
     for stage in ['train','test','all']:
         if(stage=='train'):

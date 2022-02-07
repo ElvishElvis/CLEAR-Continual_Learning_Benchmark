@@ -1,7 +1,7 @@
 from avalanche.training.plugins import StrategyPlugin
 from avalanche.training.plugins.lr_scheduling import LRSchedulerPlugin
 from torch.optim import SGD
-from torchvision.models import resnet18
+from torchvision.models import resnet18,resnet50
 from torch.nn import CrossEntropyLoss
 import torch.nn as nn
 from avalanche.benchmarks.classic import SplitMNIST
@@ -52,8 +52,33 @@ def make_scheduler(optimizer, step_size, gamma=0.1):
     return scheduler
 
 
+def extract(args):
+    print('extract feature for {}'.format(args.data_folder_path))
+    args.temp_split=args.split
+    args.split='temp_folder' # dummy folder for extracting feature
+    args=extract_feature(args)
+    print('Finished extract feature {}'.format(args.pretrain_feature))
+    os.system('rm -rf ../temp_folder')
+    args.split=args.temp_split
+    args.data_folder_path=os.path.join(args.feature_path,args.pretrain_feature)
+    return args
 
 
+def move_data_trinity(input_path,remove=True):
+    '''
+    Move data from /data to /scratch (for trinity server)
+    It only move the data in args.data_folder_path, not the current script
+    '''
+    target_path=os.path.join('/scratch/jiashi/',"/".join(input_path[1:].split('/')[:-1]))
+    print('Moving data {} to local server'.format(input_path))
+    # '/scratch/jiashi/data/jiashi/moco_resnet50_clear_10_feature'
+    path_on_scratch=os.path.join(target_path,input_path.split('/')[-1])
+    if(os.path.isdir(path_on_scratch)==False):
+        if(remove==True):
+            os.system('rm -rf {}'.format(target_path))
+        os.makedirs(target_path,exist_ok=True)
+        os.system('cp -rf {} {}'.format(input_path,target_path))
+    return path_on_scratch
 
 global args
 parser=get_config()
@@ -82,26 +107,37 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 Remember to delete the old feature path before generating new feature 
 '''
 if(args.pretrain_feature!='None'):
-    args.temp_split=args.split
-    args.split='temp_folder' # dummy folder for extracting feature
-    args=extract_feature(args)
-    print('Finished extract feature {}'.format(args.pretrain_feature))
-    os.system('rm -rf ../temp_folder')
-    args.split=args.temp_split
-    args.data_folder_path=os.path.join(args.feature_path,args.pretrain_feature)
-'''
-Move data from /data to /scratch (for trinity server)
-It only move the data in args.data_folder_path, not the current script
-'''
-target_path=os.path.join('/scratch/jiashi/',"/".join(args.data_folder_path[1:].split('/')[:-1]))
-print('Moving data to local server')
-# '/scratch/jiashi/data/jiashi/moco_resnet50_clear_10_feature'
-path_on_scratch=os.path.join(target_path,args.data_folder_path.split('/')[-1])
-if(os.path.isdir(path_on_scratch)==False):
-    os.system('rm -rf {}'.format(target_path))
-    os.makedirs(target_path,exist_ok=True)
-    os.system('cp -rf {} {}'.format(args.data_folder_path,target_path))
-args.data_folder_path=path_on_scratch
+    if(args.data_test_path !='' and args.data_train_path!=''):
+        data_test_path=args.data_test_path
+        data_train_path=args.data_train_path
+        train_num_instance_each_class=args.num_instance_each_class
+        for stage in ['train','test']:
+            if(stage=='train'):
+                args.data_folder_path=data_train_path
+                args.data_train_path=''
+                args.pretrain_feature='train_'+args.pretrain_feature
+                args=extract(args)
+                args.data_train_path=args.data_folder_path
+            else:
+                args.num_instance_each_class=args.num_instance_each_class_test
+                args.data_folder_path=data_test_path
+                args.data_test_path=''
+                args.pretrain_feature=args.pretrain_feature.replace('train','test')
+                args=extract(args)
+                args.data_test_path=args.data_folder_path
+                args.num_instance_each_class=train_num_instance_each_class
+    else:    
+        args=extract(args)
+
+if(args.data_test_path !='' and args.data_train_path!=''):
+    for stage in ['train','test']:
+        if(stage=='train'):
+            args.data_train_path=move_data_trinity(args.data_train_path,True)
+        else:
+            args.data_test_path=move_data_trinity(args.data_test_path,False)
+
+else:
+    args.data_folder_path=move_data_trinity(args.data_folder_path,True)
 
 # for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
 # ['GDumb','Naive','JointTraining','Cumulative']
@@ -126,6 +162,9 @@ for strate in method_query:
         print('========================================================')
         if args.pretrain_feature=='None':
             model=resnet18(pretrained=False) 
+            #model=resnet50(pretrained=False)
+            #model=moco_v2_yfcc_feb18_bucket_0_gpu_8(model)
+
         else:
             model=nn.Linear(2048,args.num_classes)
         data_count=int(args.num_classes*args.num_instance_each_class) if current_mode=='online' else int(args.num_classes*args.num_instance_each_class*(1-args.test_split))
