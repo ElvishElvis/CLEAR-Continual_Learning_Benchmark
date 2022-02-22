@@ -1,0 +1,41 @@
+base:
+  data_folder_path : '/data3/zhiqiul/CLEAR-10-PUBLIC/labeled_images'
+  data_train_path : '/data3/zhiqiul/CLEAR-10-PUBLIC/labeled_images'
+  data_test_path : '/data3/zhiqiul/clear_datasets/CLEAR10-TEST-CLEANED/labeled_images'
+  feature_path : '/data/jiashi/'
+  class_list : 'BACKGROUND baseball bus camera cosplay dress hockey laptop racing soccer sweater'
+
+training:
+  split : 'clear10_image_res50_nonpretrained'
+  restart : '0'
+  timestamp : 10
+  num_classes : 11
+  num_instance_each_class : 300
+  num_instance_each_class_test : 150
+  load_prev: True # whether load previous unfinished timestamp training 
+
+image_train:
+  image_train_model_arch: 'resnet50' 
+  image_train_pretrain: True
+  image_train_attribute: ''
+
+feature_train:
+  pretrain_feature : '' 
+  pretrain_feature_shape: 0
+  
+  
+
+parameter:
+  nepoch : 70
+  batch_size : 512
+  step_schedular_decay : 30
+  schedular_step : 0.1
+  start_lr : 0.01
+  weight_decay : 1e-5 
+  momentum : 0.9
+  random_seed : 1111
+  test_split : 0.3
+  max_memory_size : 30000000
+
+
+    

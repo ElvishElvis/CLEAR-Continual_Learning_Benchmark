@@ -1,7 +1,7 @@
 from avalanche.training.plugins import StrategyPlugin
 from avalanche.training.plugins.lr_scheduling import LRSchedulerPlugin
 from torch.optim import SGD
-from torchvision.models import resnet18,resnet50
+from torchvision.models import resnet18,resnet50,resnet101
 from torch.nn import CrossEntropyLoss
 import torch.nn as nn
 from avalanche.benchmarks.classic import SplitMNIST
@@ -22,6 +22,8 @@ import argparse
 from get_config import *
 from extract_feature import *
 from parse_log_to_result import *
+import glob
+import json
                        
 def build_logger(name):
     # log to text file
@@ -31,7 +33,7 @@ def build_logger(name):
     interactive_logger = InteractiveLogger()
     tb_logger = TensorboardLogger('../{}/tb_data'.format(args.split))
     eval_plugin = EvaluationPlugin(
-        accuracy_metrics(minibatch=True, epoch=True, experience=True, stream=True),
+        accuracy_metrics(minibatch=True, epoch=True, epoch_running=True,experience=True, stream=True,trained_experience=True),
         loss_metrics(minibatch=True, epoch=True, experience=True, stream=True),
         # timing_metrics(epoch=True, epoch_running=True),
         forgetting_metrics(experience=True, stream=True),
@@ -79,10 +81,13 @@ def move_data_trinity(input_path,remove=True):
         os.makedirs(target_path,exist_ok=True)
         os.system('cp -rf {} {}'.format(input_path,target_path))
     return path_on_scratch
-
 global args
-parser=get_config()
-args = parser.parse_args()
+args=get_config()
+
+
+
+
+
 try:
     restart=int(args.restart)
 except:
@@ -98,6 +103,7 @@ if(restart==1):
 os.makedirs("../{}".format(args.split),exist_ok=True)
 os.makedirs("../{}/log/".format(args.split),exist_ok=True)
 os.makedirs("../{}/model/".format(args.split),exist_ok=True)
+os.makedirs("../{}/metric/".format(args.split),exist_ok=True)
 method_query=args.method.split() # list of CL method to run
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -139,18 +145,18 @@ if(args.data_test_path !='' and args.data_train_path!=''):
 else:
     args.data_folder_path=move_data_trinity(args.data_folder_path,True)
 
-# for strate in ['EWC','CWRStar','Replay','GDumb','Cumulative','Naive','GEM','AGEM','LwF']:
-# ['GDumb','Naive','JointTraining','Cumulative']
 with open('../{}/args.txt'.format(args.split), 'w') as f:
     print('args', args, file=f) # keep a copy of the args
 os.system('cp -rf ../avalanche ../{}/'.format(args.split)) # keep a copy of the scripts
 for strate in method_query:
     for current_mode in ['offline']:
         # skip previous train model if necessary
-        model_save_path='../{}/model/model_{}_{}.pth'.format(args.split,strate,current_mode)
-        if(os.path.isfile(model_save_path)):
-            print('Skip model {}'.format(model_save_path))
-            continue
+        model_path=sorted(glob.glob('../{}/model/model_{}_{}_*'.format(args.split,strate,current_mode)))
+        if(len(model_path)!=0):
+            model_path=model_path[-1]
+            state_dict=torch.load(model_path)
+        else:
+            state_dict=None
         if(current_mode=='offline'):
             scenario = get_data_set_offline(args)
         else:
@@ -161,12 +167,13 @@ for strate in method_query:
         print('========================================================')
         print('========================================================')
         if args.pretrain_feature=='None':
-            model=resnet18(pretrained=False) 
-            #model=resnet50(pretrained=False)
-            #model=moco_v2_yfcc_feb18_bucket_0_gpu_8(model)
+            pretrain=args.image_train_pretrain
+            model=torchvision.models.__dict__[args.image_train_model_arch](pretrained=pretrain)
+            if(args.image_train_model_arch=='resnet50' and args.image_train_attribute=='moco'):
+                model=moco_v2_yfcc_feb18_bucket_0_gpu_8(model)
 
         else:
-            model=nn.Linear(2048,args.num_classes)
+            model=nn.Linear(args.pretrain_feature_shape,args.num_classes)
         data_count=int(args.num_classes*args.num_instance_each_class) if current_mode=='online' else int(args.num_classes*args.num_instance_each_class*(1-args.test_split))
         print('data_count is {}'.format(data_count))
         data_count=min(args.max_memory_size,data_count) # buffer_size cannot be greater than 3000
@@ -174,11 +181,17 @@ for strate in method_query:
             buffer_size=data_count
         else:
             buffer_size=int(strate.split("_")[-1])
+
         if torch.cuda.device_count() > 1:
             print("Let's use all GPUs!")
             model = nn.DataParallel(model)
         else:
             print("only use one GPU")
+        if(args.load_prev==True and state_dict is not None):
+            model.load_state_dict(state_dict)
+            print()
+            print('loaded previous model {}'.format(model_path))
+            print()
         if(torch.cuda.is_available()):
             model=model.cuda()
         optimizer=SGD(list(filter(lambda x: x.requires_grad, model.parameters())), lr=args.start_lr, weight_decay=args.weight_decay,momentum=args.momentum)
@@ -302,51 +315,73 @@ for strate in method_query:
         
         else:
             continue
-        # except:
-        #     print('###########################################')
-        #     print('###########################################')
-        #     print('skipping {}'.format(strate))
-        #     continue
-        # TRAINING LOOP
         print('Starting experiment...')
-        results = []
+        train_metric={}
+        test_metric = {}
         if(strate=='JointTraining' and current_mode=='offline'):
-            cl_strategy.train(scenario.train_stream)
-            results.append(cl_strategy.eval(scenario.test_stream))
+            model_save_path='../{}/model/model_{}_{}_time{}.pth'.format(args.split,strate,current_mode,0)
+            train_metric[0]=cl_strategy.train(scenario.train_stream)
+            test_metric[0]=cl_strategy.eval(scenario.test_stream)
             print('current strate is {} {}'.format(strate,current_mode))
             torch.save(model.state_dict(), model_save_path)
+            with open("../{}/metric/train_metric.json".format(args.split), "w") as out_file:
+                    json.dump(train_metric, out_file, indent = 6)
+            with open("../{}/metric/test_metric.json".format(args.split), "w") as out_file:
+                json.dump(test_metric, out_file, indent = 6)
             
         else:
-            for experience in scenario.train_stream:
+            train_list=scenario.train_stream
+            cur_timestep=0
+            if(len(model_path)!=0):
+                try:
+                    with open("../{}/metric/train_metric.json".format(args.split), "r") as file:
+                        prev_train_metric=json.load(file)
+                    with open("../{}/metric/test_metric.json".format(args.split), "r") as file:
+                        prev_test_metric=json.load(file)
+                    #extract ../clear100_imgnet_res50/model/model_BiasReservoir_Dynamic_1.0_offline_time05.pth as 5
+                    load_prev_time_index=int(model_path.split('_')[-1].split('.')[0][4:])
+                    train_list=train_list[load_prev_time_index+1:]
+                    cur_timestep=load_prev_time_index+1
+                    test_metric=prev_test_metric
+                    train_metric=prev_train_metric
+                    print('start runing from bucket {}'.format(cur_timestep))
+                except json.decoder.JSONDecodeError:
+                    pass
+
+            for experience in train_list:
+                model_save_path='../{}/model/model_{}_{}_time{}.pth'.format(args.split,strate,current_mode,str(cur_timestep).zfill(2))
                 print("Start of experience: ", experience.current_experience)
                 print("Current Classes: ", experience.classes_in_this_experience)
                 print('current strate is {} {}'.format(strate,current_mode))
                 # offline
                 if(current_mode=='offline'):
                     # train returns a dictionary which contains all the metric values
-                    res = cl_strategy.train(experience)
                     print('current strate is {} {}'.format(strate,current_mode))
                     print('Training completed')
                     print('Computing accuracy on the whole test set')
                     # test also returns a dictionary which contains all the metric values
-                    results.append(cl_strategy.eval(scenario.test_stream))
+                    train_metric[cur_timestep]=cl_strategy.train(experience)
+                    test_metric[cur_timestep]=cl_strategy.eval(scenario.test_stream)
                     print('current strate is {} {}'.format(strate,current_mode))
                 # online
                 else:
                     print('current strate is {} {}'.format(strate,current_mode))
                     print('Computing accuracy on the future timestamp')
-                    results.append(cl_strategy.eval(scenario.test_stream))
+                    test_metric[cur_timestep]=cl_strategy.eval(scenario.test_stream)
+                    train_metric[cur_timestep]=cl_strategy.train(experience)
                     # train returns a dictionary which contains all the metric values
-                    res = cl_strategy.train(experience)
                     print('Training completed')
                     print('current strate is {} {}'.format(strate,current_mode))
                 torch.save(model.state_dict(), model_save_path)
                 log_path='../{}/log/'.format(args.split)
                 log_name='log_{}.txt'.format("{}_{}".format(strate,current_mode))
+                with open("../{}/metric/train_metric.json".format(args.split), "w") as out_file:
+                    json.dump(train_metric, out_file, indent = 6)
+                with open("../{}/metric/test_metric.json".format(args.split), "w") as out_file:
+                    # convert tensor to string for json dump
+                    test_metric[cur_timestep]['ConfusionMatrix_Stream/eval_phase/test_stream']=\
+                    test_metric[cur_timestep]['ConfusionMatrix_Stream/eval_phase/test_stream'].numpy().tolist()
+                    json.dump(test_metric, out_file, indent = 6)
+                out_file.close()
+                cur_timestep+=1
                 # move_metric_to_main_node(log_path,log_name,main_server_path='/data/jiashi/metric')
-
-
-                
-            
-            
-

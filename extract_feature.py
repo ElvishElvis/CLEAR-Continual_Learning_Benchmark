@@ -107,6 +107,10 @@ def extract_feature(args):
         model=resnet50(pretrained=False)
         model=moco_v2_yfcc_feb18_bucket_0_gpu_8(model)
         model.fc = torch.nn.Identity()
+    elif(pre_dataset=='imagenet' and pre_net=='resnet50'):
+        model=resnet50(pretrained=True)
+        model.fc = torch.nn.Identity()
+
     else:
         assert False, "Couldn't find a valid pretrain feature setting"
 
