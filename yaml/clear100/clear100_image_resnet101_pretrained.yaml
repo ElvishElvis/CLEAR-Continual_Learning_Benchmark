@@ -15,6 +15,7 @@ base:
                 tie toilet toy vase violin volleyball wine zoo'
 
 training:
+  method : 'LwF Replay  Reservoir BiasReservoir_Fixed_reset_0.2 BiasReservoir_Dynamic_1.0 '  
   split : 'clear100_image_resnet101_pretrained'
   restart : '0'
   timestamp : 10
@@ -22,6 +23,7 @@ training:
   num_instance_each_class : 1000
   num_instance_each_class_test : 1000
   load_prev: True # whether load previous unfinished timestamp training 
+  eval: False
 
 image_train:
   image_train_model_arch: 'resnet101' 

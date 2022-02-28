@@ -4,6 +4,7 @@ from torch.optim import SGD
 from torchvision.models import resnet18,resnet50,resnet101
 from torch.nn import CrossEntropyLoss
 import torch.nn as nn
+import torchvision
 from avalanche.benchmarks.classic import SplitMNIST
 from avalanche.evaluation.metrics import forgetting_metrics, accuracy_metrics, \
     loss_metrics, timing_metrics, cpu_usage_metrics, confusion_matrix_metrics, disk_usage_metrics
@@ -66,7 +67,7 @@ def extract(args):
     return args
 
 
-def move_data_trinity(input_path,remove=True):
+def move_data_trinity(input_path,remove=False):
     '''
     Move data from /data to /scratch (for trinity server)
     It only move the data in args.data_folder_path, not the current script
@@ -75,9 +76,11 @@ def move_data_trinity(input_path,remove=True):
     print('Moving data {} to local server'.format(input_path))
     # '/scratch/jiashi/data/jiashi/moco_resnet50_clear_10_feature'
     path_on_scratch=os.path.join(target_path,input_path.split('/')[-1])
+    print(path_on_scratch)
     if(os.path.isdir(path_on_scratch)==False):
         if(remove==True):
-            os.system('rm -rf {}'.format(target_path))
+            print('rm previous data path')
+            assert False
         os.makedirs(target_path,exist_ok=True)
         os.system('cp -rf {} {}'.format(input_path,target_path))
     return path_on_scratch
@@ -98,7 +101,7 @@ if(restart==1):
     print('enter Y/y to continue')
     value=input()
     if(value=="y" or value=='Y'):
-        os.system('rm -rf ../{}'.format(args.split))
+        assert False
         print('remove old split folder')
 os.makedirs("../{}".format(args.split),exist_ok=True)
 os.makedirs("../{}/log/".format(args.split),exist_ok=True)
@@ -138,12 +141,12 @@ if(args.pretrain_feature!='None'):
 if(args.data_test_path !='' and args.data_train_path!=''):
     for stage in ['train','test']:
         if(stage=='train'):
-            args.data_train_path=move_data_trinity(args.data_train_path,True)
+            args.data_train_path=move_data_trinity(args.data_train_path,False)
         else:
             args.data_test_path=move_data_trinity(args.data_test_path,False)
 
 else:
-    args.data_folder_path=move_data_trinity(args.data_folder_path,True)
+    args.data_folder_path=move_data_trinity(args.data_folder_path,False)
 
 with open('../{}/args.txt'.format(args.split), 'w') as f:
     print('args', args, file=f) # keep a copy of the args
@@ -151,7 +154,12 @@ os.system('cp -rf ../avalanche ../{}/'.format(args.split)) # keep a copy of the 
 for strate in method_query:
     for current_mode in ['offline']:
         # skip previous train model if necessary
-        model_path=sorted(glob.glob('../{}/model/model_{}_{}_*'.format(args.split,strate,current_mode)))
+        import glob
+        model_path=sorted(glob.glob('../{}/model/model_{}_{}*'.format(args.split,strate,current_mode)))
+        if(len(model_path)==0 and args.eval==True):
+            checkpoint_path='../{}/model/model_{}_{}*'.format(args.split,strate,current_mode)
+            print('Checkpoint for model {} is not found at path {}'.format(strate,checkpoint_path))
+            continue
         if(len(model_path)!=0):
             model_path=model_path[-1]
             state_dict=torch.load(model_path)
@@ -194,7 +202,7 @@ for strate in method_query:
             print()
         if(torch.cuda.is_available()):
             model=model.cuda()
-        optimizer=SGD(list(filter(lambda x: x.requires_grad, model.parameters())), lr=args.start_lr, weight_decay=args.weight_decay,momentum=args.momentum)
+        optimizer=SGD(list(filter(lambda x: x.requires_grad, model.parameters())), lr=args.start_lr, weight_decay=float(args.weight_decay),momentum=args.momentum)
         scheduler= make_scheduler(optimizer,args.step_schedular_decay,args.schedular_step)
         # patience=5 # Number of epochs to wait without generalization improvements before stopping the training .
         # EarlyStoppingPlugin(patience, 'train_stream')
@@ -320,23 +328,24 @@ for strate in method_query:
         test_metric = {}
         if(strate=='JointTraining' and current_mode=='offline'):
             model_save_path='../{}/model/model_{}_{}_time{}.pth'.format(args.split,strate,current_mode,0)
-            train_metric[0]=cl_strategy.train(scenario.train_stream)
+            if(args.eval==False):
+                train_metric[0]=cl_strategy.train(scenario.train_stream)
             test_metric[0]=cl_strategy.eval(scenario.test_stream)
             print('current strate is {} {}'.format(strate,current_mode))
             torch.save(model.state_dict(), model_save_path)
-            with open("../{}/metric/train_metric.json".format(args.split), "w") as out_file:
+            with open("../{}/metric/train_metric_{}.json".format(args.split,strate), "w") as out_file:
                     json.dump(train_metric, out_file, indent = 6)
-            with open("../{}/metric/test_metric.json".format(args.split), "w") as out_file:
+            with open("../{}/metric/test_metric_{}.json".format(args.split,strate), "w") as out_file:
                 json.dump(test_metric, out_file, indent = 6)
             
         else:
             train_list=scenario.train_stream
             cur_timestep=0
-            if(len(model_path)!=0):
+            if(len(model_path)!=0 and args.load_prev==True):
                 try:
-                    with open("../{}/metric/train_metric.json".format(args.split), "r") as file:
+                    with open("../{}/metric/train_metric_{}.json".format(args.split,strate), "r") as file:
                         prev_train_metric=json.load(file)
-                    with open("../{}/metric/test_metric.json".format(args.split), "r") as file:
+                    with open("../{}/metric/test_metric_{}.json".format(args.split,strate), "r") as file:
                         prev_test_metric=json.load(file)
                     #extract ../clear100_imgnet_res50/model/model_BiasReservoir_Dynamic_1.0_offline_time05.pth as 5
                     load_prev_time_index=int(model_path.split('_')[-1].split('.')[0][4:])
@@ -345,7 +354,7 @@ for strate in method_query:
                     test_metric=prev_test_metric
                     train_metric=prev_train_metric
                     print('start runing from bucket {}'.format(cur_timestep))
-                except json.decoder.JSONDecodeError:
+                except:
                     pass
 
             for experience in train_list:
@@ -360,7 +369,8 @@ for strate in method_query:
                     print('Training completed')
                     print('Computing accuracy on the whole test set')
                     # test also returns a dictionary which contains all the metric values
-                    train_metric[cur_timestep]=cl_strategy.train(experience)
+                    if(args.eval==False):
+                        train_metric[cur_timestep]=cl_strategy.train(experience)
                     test_metric[cur_timestep]=cl_strategy.eval(scenario.test_stream)
                     print('current strate is {} {}'.format(strate,current_mode))
                 # online
@@ -368,20 +378,23 @@ for strate in method_query:
                     print('current strate is {} {}'.format(strate,current_mode))
                     print('Computing accuracy on the future timestamp')
                     test_metric[cur_timestep]=cl_strategy.eval(scenario.test_stream)
-                    train_metric[cur_timestep]=cl_strategy.train(experience)
+                    if(args.eval==False):
+                        train_metric[cur_timestep]=cl_strategy.train(experience)
                     # train returns a dictionary which contains all the metric values
                     print('Training completed')
                     print('current strate is {} {}'.format(strate,current_mode))
                 torch.save(model.state_dict(), model_save_path)
                 log_path='../{}/log/'.format(args.split)
                 log_name='log_{}.txt'.format("{}_{}".format(strate,current_mode))
-                with open("../{}/metric/train_metric.json".format(args.split), "w") as out_file:
+                with open("../{}/metric/train_metric_{}.json".format(args.split,strate), "w") as out_file:
                     json.dump(train_metric, out_file, indent = 6)
-                with open("../{}/metric/test_metric.json".format(args.split), "w") as out_file:
+                with open("../{}/metric/test_metric_{}.json".format(args.split,strate), "w") as out_file:
                     # convert tensor to string for json dump
                     test_metric[cur_timestep]['ConfusionMatrix_Stream/eval_phase/test_stream']=\
                     test_metric[cur_timestep]['ConfusionMatrix_Stream/eval_phase/test_stream'].numpy().tolist()
                     json.dump(test_metric, out_file, indent = 6)
                 out_file.close()
                 cur_timestep+=1
+                if(args.eval==True):
+                    break
                 # move_metric_to_main_node(log_path,log_name,main_server_path='/data/jiashi/metric')
