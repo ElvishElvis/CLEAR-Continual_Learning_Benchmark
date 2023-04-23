@@ -135,11 +135,3 @@ def extract_feature(args):
 
 
 
-# global args
-# parser=get_config()
-# args = parser.parse_args()
-# feature_list=['moco']
-# # import pdb;pdb.set_trace()
-# extract_feature(args,feature_list)
-
-

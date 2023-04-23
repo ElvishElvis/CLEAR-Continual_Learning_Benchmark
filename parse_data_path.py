@@ -2,30 +2,14 @@
 import os
 import os.path as osp
 from sklearn.model_selection import train_test_split
-# data_dir ='/scratch/zhiqiu/yfcc_dynamic_10/dynamic_300/images'
 
-
-# def list_all_files(rootdir):
-#     _files = []
-#     list_file = os.listdir(rootdir)
-#     for i in range(0,len(list_file)):
-#         path = os.path.join(rootdir,list_file[i])
-
-#         if os.path.isdir(path):
-#             _files.extend(list_all_files(path))
-#         if os.path.isfile(path):
-#              _files.append(path)
-#     return _files
 
 def list_all_files(args,rootdir):
     train_list,test_list,all_list = [],[],[]
     bucket_list = os.listdir(rootdir)
-    # bucket_list=list(filter(lambda a: 'bucket_' in a,bucket_list))
     if('0' in bucket_list):
         bucket_list.remove('0') # skip bucket 0, since it's for pretrain feature
     classes_list=  os.listdir(osp.join(rootdir,bucket_list[0]))
-    if('clear25d' in args.split and 'BACKGROUND' in classes_list):
-        classes_list.remove('BACKGROUND') # skip bucket 0, since it's for pretrain feature
     for bucket in bucket_list:
         for classes in classes_list:
             image_list=os.listdir(osp.join(rootdir,bucket,classes))
@@ -35,7 +19,7 @@ def list_all_files(args,rootdir):
                 assert len(image_list)==args.num_instance_each_class
             except:
                 import pdb;pdb.set_trace()
-                print('a')
+                print('Error!')
             train_subset,test_subset=train_test_split(image_list,test_size=args.test_split, random_state=args.random_seed)
             train_list.extend(train_subset)
             test_list.extend(test_subset)
